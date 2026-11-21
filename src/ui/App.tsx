@@ -1,20 +1,21 @@
 import { Component, useEffect, useState, type ErrorInfo, type ReactNode } from 'react'
-import { BookOpen, Home, MessageCircle, Settings } from 'lucide-react'
+import { BarChart3, BookOpen, Home, MessageCircle, Settings } from 'lucide-react'
 import { translate } from '../i18n'
 import type { Transaction, TxType } from '../domain/types'
 import { BooksProvider, useBooks } from './books'
 import { draftFrom, EntrySheet, type Draft } from './EntrySheet'
 import { AskScreen } from './screens/AskScreen'
 import { HomeScreen } from './screens/HomeScreen'
+import { InsightsScreen } from './screens/InsightsScreen'
 import { LedgerScreen } from './screens/LedgerScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { WelcomeScreen } from './screens/WelcomeScreen'
 
-type Page = 'home' | 'ledger' | 'ask' | 'settings'
+type Page = 'home' | 'ledger' | 'insights' | 'ask' | 'settings'
 
 function readPage(): Page {
   const name = location.hash.replace(/^#\/?/, '')
-  if (name === 'ledger' || name === 'ask' || name === 'settings') return name
+  if (name === 'ledger' || name === 'insights' || name === 'ask' || name === 'settings') return name
   return 'home'
 }
 
@@ -44,10 +45,10 @@ class BooksBoundary extends Component<{ children: ReactNode }, { failed: boolean
 }
 
 function Shell() {
-  const { state, notice } = useBooks()
+  const { state, notice, dispatch, notify } = useBooks()
   const [page, setPage] = useState<Page>(readPage)
   const [draft, setDraft] = useState<Draft | null>(null)
-  const t = (key: 'home' | 'ledger' | 'ask' | 'settings') => translate(state.locale, key)
+  const t = (key: 'home' | 'ledger' | 'insights' | 'ask' | 'settings') => translate(state.locale, key)
 
   useEffect(() => {
     const onHash = () => setPage(readPage())
@@ -68,9 +69,20 @@ function Shell() {
     setDraft(draftFrom(row.type, row))
   }
 
+  function ask(question: string) {
+    sessionStorage.setItem('ledger-ai-pending-ask', question)
+    go('ask')
+  }
+
+  function remove(row: Transaction) {
+    dispatch({ type: 'remove', id: row.id, now: new Date().toISOString() })
+    notify(translate(state.locale, 'deleted'))
+  }
+
   const items = [
     ['home', Home],
     ['ledger', BookOpen],
+    ['insights', BarChart3],
     ['ask', MessageCircle],
     ['settings', Settings],
   ] as const
@@ -87,8 +99,9 @@ function Shell() {
       </nav>
       <div key={page} className="stage page-swap">
         <div className="tape" aria-hidden="true" />
-        {page === 'home' ? <HomeScreen onAdd={add} onLedger={() => go('ledger')} /> : null}
+        {page === 'home' ? <HomeScreen onDraft={setDraft} onLedger={() => go('ledger')} onAsk={ask} onDelete={remove} /> : null}
         {page === 'ledger' ? <LedgerScreen onAdd={add} onOpen={open} /> : null}
+        {page === 'insights' ? <InsightsScreen /> : null}
         {page === 'ask' ? <AskScreen /> : null}
         {page === 'settings' ? <SettingsScreen /> : null}
       </div>

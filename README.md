@@ -22,18 +22,20 @@ React screens
     │
     ├─ domain (money in paise, periods, import, backup, sync merge, AI tools)
     ├─ IndexedDB  ledger-ai / state-v1
-    ├─ sync engine ── Supabase Auth + Postgres, row level security
+    ├─ sync engine ── Cloudflare Worker + D1, bearer session
     └─ chat loop
            ├─ tools run on this device against the open books
            └─ LlmProvider
                  ├─ PhraseProvider   VITE_LLM_MODE=mock, no key, small phrase list
-                 └─ ProxyProvider    POST to the dev server or the Supabase edge function
-                                         └─ Gemini, API key only on the server
+                 └─ ProxyProvider    POST /api/ai-chat on the same Worker
+                                         └─ Gemini, API key only as a Worker secret
 ```
 
 Amounts are integer paise. A period total is the sum of those integers.
 
-Sync is last-write-wins on `updated_at`. If two devices save the same row at the same instant, the copy already on the server stays, so both devices end on one row. A delete is a tombstone (`deleted_at`) and participates in the same rule. The phone and the computer need roughly correct clocks. The full book is small for one shop, so each sync reads the person’s rows and uploads only the rows this device won.
+Sync is last-write-wins on `updated_at`. If two devices save the same row at the same instant, the copy already on the server stays, so both devices end on one row. The Worker refuses a push that is not strictly newer. A delete is a tombstone (`deleted_at`) and participates in the same rule. The phone and the computer need roughly correct clocks. Each query is limited to the signed-in user id taken from the session on the server. `transactions_user_updated_idx` keeps a sync to that person’s rows.
+
+Sign-in is email and password on the Worker. The session is a random bearer token stored in the WebView (`localStorage` key `ledger-ai-bearer`). The database stores only a SHA-256 of that token. Capacitor Android loads the app from `https://localhost`, and Tauri Windows loads it from `http://tauri.localhost` or `https://tauri.localhost`. Those origins are not the Worker’s origin, so a cookie set by the Worker would be a third-party cookie and WebViews drop it. The app sends `Authorization: Bearer` instead. CORS allows that header and does not use credentials.
 
 The assistant never receives the whole book. The phone runs the query (`period_totals`, `list_transactions`, `balance_on`, `category_totals`) and sends the tool result back through the proxy. If a reply states a rupee amount that was not in a tool result, the app drops that sentence and keeps the tool strip.
 
@@ -62,30 +64,32 @@ Copy `.env.example`. Do not commit `.env`.
 
 | Name | Where it is read | Purpose |
 | --- | --- | --- |
-| `VITE_SUPABASE_URL` | app | Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | app | Supabase anon key. It is public. Row Level Security limits each person to their own rows. Never put the service-role key in the app. |
-| `VITE_AI_PROXY_URL` | app | Optional. Leave empty to call the Supabase function `ai-chat` after sign-in. Set it only if the proxy lives somewhere else. |
+| `VITE_API_URL` | app | Absolute Worker URL, for example `https://ledger-ai.<account>.workers.dev`. Required on Android and Windows. Leave empty for `npm run dev`, which proxies `/api` to wrangler on port 8787. |
 | `VITE_LLM_MODE` | app | Set to `mock` for the on-device phrase tool-caller. Leave empty in production. |
-| `GEMINI_API_KEY` | dev server and edge function only | Google AI Studio key. No `VITE_` prefix, so Vite does not put it in the Android or Windows bundle. |
-| `GEMINI_MODEL` | dev server and edge function | Defaults to `gemini-2.5-flash`. |
+| `GEMINI_API_KEY` | Worker secret only | Google AI Studio key. Put it in `.dev.vars` for local wrangler and `wrangler secret put` for production. No `VITE_` prefix, so it is never bundled into the Android or Windows app. |
+| `GEMINI_MODEL` | Worker var | Defaults to `gemini-2.5-flash` in `wrangler.toml`. |
 
-`npm run dev` exposes `POST /api/ai-chat` on the machine running Vite. That route reads `GEMINI_API_KEY` and forwards the chat to Gemini. A production build does not include that route.
+## Cloudflare
 
-## Supabase
+The free plan is enough for one shop. D1 holds the users, sessions, shop profile, and transactions. One Worker serves sign-in, sync, and the Gemini proxy.
 
-1. Create a free project at https://supabase.com.
-2. In the SQL editor, run `supabase/migrations/20260321000000_ledger.sql`.
-3. Authentication → Providers → Email. For a family shop, turn off “Confirm email” so the first sign-in does not wait on an inbox. If you leave it on, the app tells the person to confirm, then sign in.
-4. Deploy the edge function in `supabase/functions/ai-chat`:
+1. Create a free account at https://dash.cloudflare.com/sign-up.
+2. From this repo, sign the Wrangler CLI into that account: `npx wrangler login`.
+3. Create the database: `npx wrangler d1 create ledger-ai`. Copy the printed `database_id` into `wrangler.toml` in place of `00000000-0000-0000-0000-000000000000`.
+4. Apply the schema locally and remotely:
 
 ```bash
-supabase secrets set GEMINI_API_KEY=your-key
-supabase functions deploy ai-chat
+npx wrangler d1 migrations apply ledger-ai --local
+npx wrangler d1 migrations apply ledger-ai --remote
 ```
 
-The function checks the signed-in user’s token, then calls Gemini. It does not read the ledger tables. Set `GEMINI_MODEL` the same way if you want a different model.
+5. Copy `.dev.vars.example` to `.dev.vars` and set `GEMINI_API_KEY` for local runs. For the deployed Worker: `npx wrangler secret put GEMINI_API_KEY`.
+6. Deploy: `npm run worker:deploy` (this runs `wrangler deploy`). Wrangler prints the URL, shaped like `https://ledger-ai.<account>.workers.dev`.
+7. Put that exact URL in the app’s `.env` as `VITE_API_URL`, with no trailing path. Rebuild the Android and Windows apps so the URL is baked in. The Gemini key is not baked in.
 
-5. Put the project URL and anon key in `.env`, rebuild, and install that build on the phone and the PC.
+Local development is two processes. `npm run worker:dev` starts the Worker on http://127.0.0.1:8787 with Miniflare and the local D1 file. `npm run dev` proxies `/api` to that port. Leave `VITE_API_URL` empty while you do this.
+
+The Worker checks the bearer token before every sync or chat call, then reads and writes only `user_id` from that session. Chat forwards the question to Gemini with the `x-goog-api-key` header. The key is not returned to the phone.
 
 ## Import from Daily Ledger
 
@@ -128,7 +132,7 @@ You need the Rust toolchain (https://rustup.rs) as well as Node. The installers 
 
 This Linux environment can hold the Tauri project and icons. It does not produce the Windows installers. Cross-compiling the Windows webview from Linux is not part of the setup.
 
-The content security policy allows `https:` and `wss:` so a Supabase project URL works without editing the policy for each project.
+The content security policy allows `https:` and `wss:` so the Worker URL works without editing the policy for each account. Capacitor uses `androidScheme: https`, so the phone origin is `https://localhost` and the Worker is a different host. The bearer token is how those two stay signed in.
 
 ## Tests
 
@@ -136,25 +140,29 @@ The content security policy allows `https:` and `wss:` so a Supabase project URL
 npm test
 ```
 
-The suite covers paise and lakh formatting, day/month/year/range totals, Daily Ledger import, backup round-trip, CSV (UTF-8 BOM and formula text), last-write-wins sync, the chat tool loop (including a rejected invented total), the Gemini request builder, Indic shaping for the Devanagari i-matra, and a PDF that embeds the Noto fonts. Sync and the assistant are exercised with an in-memory transport and a scripted provider. No test calls Supabase or Google.
+The suite covers paise and lakh formatting, day/month/year/range totals, Daily Ledger import, backup round-trip, CSV (UTF-8 BOM and formula text), last-write-wins sync, the Worker sign-in and user-scoped sync, the chat proxy (session required, key not returned), the Gemini request builder, Indic shaping for the Devanagari i-matra, and a PDF that embeds the Noto fonts. Sync, auth, and the assistant are exercised with an in-memory store and a scripted fetch. No test calls Cloudflare or Google.
 
 ## Free-tier limits for shop books
 
-- A free Supabase project pauses after about a week with no activity. The books on the phone and the PC keep working. The next sync waits until the project wakes, which can take a few minutes. Export a backup before a long holiday. Unpausing is done from the Supabase dashboard.
-- Free-project database size, file storage, and egress have quotas. One shop’s ledger is small. Don’t attach photos or other large files later without checking the quota.
+- D1’s free plan allows 5 million rows read and 100,000 rows written per day, and 5 GB stored. One shop stays far under that because each sync reads that user’s indexed rows, not the whole database. If a day does go past the limit, queries fail until the counter resets at 00:00 UTC, which is 05:30 IST. There is no inactivity pause. The books on the phone and the PC keep working offline either way. Export a backup before a long holiday.
+- D1 keeps 7 days of Time Travel. From the Cloudflare dashboard you can restore the database to a point in that window. A restore replaces the live database, so do it only when the copy on the phone is also backed up.
+- Workers free includes 100,000 requests a day. Sign-in, sync, and a question each count as one request.
 - Gemini’s free tier in Google AI Studio can use prompts to improve Google’s products. A question, and the tool result that answers it, are sent to Google. The tool result can include amounts, titles, and notes. The rest of the book stays on the device. Read the current Gemini terms before putting real books on the free tier. A paid Gemini or Vertex route with different data terms can replace `completeWithGemini` without changing the screens. The `LlmProvider` interface is the only seam.
-- The anon key is not a secret. The service-role key and `GEMINI_API_KEY` are. They stay in Supabase secrets or in `.env` on your computer.
+- `GEMINI_API_KEY` is a secret. It lives in `.dev.vars` or a Worker secret, never in the app and never with a `VITE_` prefix. The bearer token in the WebView is the person’s session. Anyone with that token can read that person’s books until it expires (30 days) or they sign out.
 
 ## What the owner needs to provide
 
 Nothing else is billed if you stay on the free tiers above.
 
-1. A Supabase account, a project URL, and that project’s anon key.
-2. The SQL in `supabase/migrations/20260321000000_ledger.sql` applied to that project.
-3. The `ai-chat` edge function deployed from `supabase/functions/ai-chat`.
-4. A Gemini API key from Google AI Studio, stored as the Supabase secret `GEMINI_API_KEY` and, for `npm run dev` only, in `.env`.
-5. Optional: `GEMINI_MODEL` if `gemini-2.5-flash` is not the model you want.
-6. Optional, only for a Play Store or sideload update that must match a future release: an Android release keystore. Debug builds do not need it.
-7. On the Windows PC used to build the installer: Rust, Node 22, and WebView2.
+1. A Cloudflare account.
+2. `npx wrangler login` on the machine that deploys.
+3. `npx wrangler d1 create ledger-ai`, then the printed database id pasted into `wrangler.toml`.
+4. `npx wrangler d1 migrations apply ledger-ai --remote` (and `--local` on the machine you develop on).
+5. A Gemini API key from Google AI Studio, stored with `npx wrangler secret put GEMINI_API_KEY`. For local wrangler, the same key in `.dev.vars`.
+6. `npm run worker:deploy`.
+7. The printed `*.workers.dev` URL in the app’s `.env` as `VITE_API_URL`, then a rebuild of Android and Windows.
+8. Optional: change `GEMINI_MODEL` in `wrangler.toml` if `gemini-2.5-flash` is not the model you want.
+9. Optional, only for a Play Store or sideload update that must match a future release: an Android release keystore. Debug builds do not need it.
+10. On the Windows PC used to build the installer: Rust, Node 22, and WebView2.
 
-After those are set, rebuild the Android and Windows apps so the URL and anon key are baked into that install. The Gemini key is not baked in.
+After those are set, rebuild the Android and Windows apps so `VITE_API_URL` is baked into that install. The Gemini key is not baked in.

@@ -126,6 +126,14 @@ export const en = {
   suggestionCloth: 'How much did I spend on cloth last month?',
   suggestionBalance: 'What is my balance?',
   suggestionIncome: 'How much income this month?',
+  insights: 'Insights',
+  trend: 'Six months',
+  topCategories: 'Top categories',
+  quickAdd: 'Add again',
+  askHome: 'Ask your books',
+  edit: 'Edit',
+  incomeVsExpense: 'Income and expenses',
+  noCategories: 'No categories in this period.',
   crash: 'Ledger AI hit a problem. Your books are still on this device. Close the app and open it again.',
 } as const
 
@@ -259,6 +267,14 @@ export const hi: Record<MessageKey, string> = {
   suggestionCloth: 'पिछले महीने कपड़े पर कितना खर्च हुआ?',
   suggestionBalance: 'मेरी बाकी कितनी है?',
   suggestionIncome: 'इस महीने आमदनी कितनी है?',
+  insights: 'झलक',
+  trend: 'छह महीने',
+  topCategories: 'बड़े वर्ग',
+  quickAdd: 'फिर से जोड़ें',
+  askHome: 'हिसाब से पूछें',
+  edit: 'बदलें',
+  incomeVsExpense: 'आमदनी और खर्च',
+  noCategories: 'इस अवधि में कोई वर्ग नहीं.',
   crash: 'Ledger AI में दिक्कत आई. आपका हिसाब इस डिवाइस पर सुरक्षित है. ऐप बंद करके फिर खोलिए.',
 }
 
@@ -390,5 +406,13 @@ export const gu: Record<MessageKey, string> = {
   suggestionCloth: 'ગયા મહિને કપડા પાછળ કેટલા ખર્ચ્યા?',
   suggestionBalance: 'મારી બાકી કેટલી છે?',
   suggestionIncome: 'આ મહિને આવક કેટલી છે?',
+  insights: 'ઝલક',
+  trend: 'છ મહિના',
+  topCategories: 'મોટા વર્ગ',
+  quickAdd: 'ફરી ઉમેરો',
+  askHome: 'હિસાબને પૂછો',
+  edit: 'ફેરફાર',
+  incomeVsExpense: 'આવક અને ખર્ચ',
+  noCategories: 'આ સમયમાં કોઈ વર્ગ નથી.',
   crash: 'Ledger AI માં તકલીફ આવી. તમારો હિસાબ આ ડિવાઇસ પર સુરક્ષિત છે. એપ બંધ કરીને ફરી ખોલો.',
 }

@@ -1,0 +1,14 @@
+name = "ledger-ai"
+main = "worker/index.ts"
+compatibility_date = "2025-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Create the database with `npx wrangler d1 create ledger-ai` and paste the id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "ledger-ai"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[vars]
+GEMINI_MODEL = "gemini-2.5-flash"

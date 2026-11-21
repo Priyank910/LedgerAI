@@ -1,7 +1,6 @@
 import type { IncomingMessage } from 'node:http'
 import react from '@vitejs/plugin-react'
-import { defineConfig, loadEnv, type Plugin } from 'vite'
-import { aiDevPlugin } from './vite.ai-plugin'
+import { defineConfig, type Plugin } from 'vite'
 
 function rewriteDesignOptions(request: IncomingMessage) {
   const url = request.url ?? ''
@@ -27,10 +26,14 @@ function designOptionsPlugin(): Plugin {
   }
 }
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
+export default defineConfig(() => {
   return {
-    plugins: [designOptionsPlugin(), react(), aiDevPlugin(env.GEMINI_API_KEY, env.GEMINI_MODEL)],
-    server: { host: '0.0.0.0', port: 5173 },
+    plugins: [designOptionsPlugin(), react()],
+    build: { rollupOptions: { input: 'index.html' } },
+    server: {
+      host: '0.0.0.0',
+      port: 5173,
+      proxy: { '/api': { target: 'http://127.0.0.1:8787', changeOrigin: true } },
+    },
   }
 })

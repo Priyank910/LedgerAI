@@ -19,6 +19,19 @@ export type Draft = {
   note: string
 }
 
+export function draftPreset(input: { type: TxType; title: string; category: string; payment: string }): Draft {
+  return {
+    mode: 'add',
+    type: input.type,
+    title: input.title,
+    amount: '',
+    date: todayLocal(),
+    payment: input.payment,
+    category: input.category,
+    note: '',
+  }
+}
+
 export function draftFrom(type: TxType, row?: Transaction): Draft {
   if (!row) {
     return { mode: 'add', type, title: '', amount: '', date: todayLocal(), payment: 'cash', category: defaultCategory(type), note: '' }

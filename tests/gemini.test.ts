@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { TOOL_SPECS } from '../src/domain/ai/tools'
-import { buildGeminiRequest, completeWithGemini, parseGeminiResponse, systemPrompt } from '../supabase/functions/ai-chat/gemini'
+import { buildGeminiRequest, completeWithGemini, parseGeminiResponse, systemPrompt } from '../src/llm/gemini'
 
 describe('gemini proxy contract', () => {
   it('builds a tool-calling request and parses a function call without putting the key in the body', () => {

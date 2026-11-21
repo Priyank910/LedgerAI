@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ChatResult, LlmMessage } from '../../domain/ai/loop'
 import { formatInr } from '../../domain/money'
 import { categoryLabel, formatDate, translate, type MessageKey } from '../../i18n'
@@ -11,6 +11,16 @@ export function AskScreen() {
   const [history, setHistory] = useState<LlmMessage[]>([])
   const [turns, setTurns] = useState<{ question: string; result?: ChatResult; error?: 'sign-in' | 'unavailable' | 'failed' }[]>([])
   const [busy, setBusy] = useState(false)
+  const started = useRef(false)
+
+  useEffect(() => {
+    if (started.current) return
+    const pending = sessionStorage.getItem('ledger-ai-pending-ask')
+    if (!pending) return
+    started.current = true
+    sessionStorage.removeItem('ledger-ai-pending-ask')
+    void send(pending)
+  }, [])
 
   async function send(text: string) {
     const trimmed = text.trim()

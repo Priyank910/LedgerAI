@@ -8,7 +8,7 @@ import { PhraseProvider } from '../llm/phrase'
 import { ProxyProvider } from '../llm/proxy'
 import { chatTarget } from '../llm/target'
 import { loadState, saveState } from '../storage/idb'
-import { createSupabase, createTransport, readSupabaseEnv } from '../sync/remote'
+import { apiOrigin, createCloudTransport, currentSession, readToken, signIn as cloudSignIn, signOut as cloudSignOut, signUp as cloudSignUp } from '../sync/cloud'
 import { syncOnce } from '../domain/sync'
 
 export type SyncStatus =
@@ -55,8 +55,6 @@ export function BooksProvider({ children }: { children: ReactNode }) {
   const [notice, setNotice] = useState('')
   const stateRef = useRef<PersistedState | null>(null)
   const tokenRef = useRef<string | null>(null)
-  const userIdRef = useRef<string | null>(null)
-  const clientRef = useRef<ReturnType<typeof createSupabase> | null>(null)
   const skipSave = useRef(true)
   const noticeTimer = useRef<number>(0)
   stateRef.current = state
@@ -76,20 +74,16 @@ export function BooksProvider({ children }: { children: ReactNode }) {
   }, [state])
 
   useEffect(() => {
-    const env = readSupabaseEnv()
-    if (!env) {
+    if (apiOrigin() === null) {
       setSyncStatus({ kind: 'unconfigured' })
       return
     }
-    const client = createSupabase(env)
-    clientRef.current = client
-    const { data } = client.auth.onAuthStateChange((_event, session) => {
-      setEmail(session?.user.email ?? null)
-      tokenRef.current = session?.access_token ?? null
-      userIdRef.current = session?.user.id ?? null
-      if (!session) setSyncStatus({ kind: 'signed-out' })
+    tokenRef.current = readToken()
+    void currentSession().then((session) => {
+      tokenRef.current = readToken()
+      setEmail(session?.email ?? null)
+      setSyncStatus(session ? { kind: 'syncing' } : { kind: 'signed-out' })
     })
-    return () => data.subscription.unsubscribe()
   }, [])
 
   const ledgerKey = state ? signature(state) : ''
@@ -106,16 +100,14 @@ export function BooksProvider({ children }: { children: ReactNode }) {
 
   async function pushAndPull() {
     const current = stateRef.current
-    const client = clientRef.current
-    const userId = userIdRef.current
-    if (!current?.profile || !client || !userId) return
+    if (!current?.profile || !tokenRef.current || apiOrigin() === null) return
     if (!navigator.onLine) {
       setSyncStatus({ kind: 'offline' })
       return
     }
     setSyncStatus({ kind: 'syncing' })
     try {
-      const merged = await syncOnce({ profile: current.profile, transactions: current.transactions }, createTransport(client, userId))
+      const merged = await syncOnce({ profile: current.profile, transactions: current.transactions }, createCloudTransport())
       const next = { ...current, profile: merged.profile, transactions: merged.transactions }
       if (signature(next) !== signature(current)) setState(next)
       setSyncStatus({ kind: 'synced', at: clockLabel() })
@@ -135,35 +127,42 @@ export function BooksProvider({ children }: { children: ReactNode }) {
   }
 
   async function signIn(nextEmail: string, password: string): Promise<string | null> {
-    const client = clientRef.current
-    if (!client) return 'syncUnconfigured'
-    const { error } = await client.auth.signInWithPassword({ email: nextEmail.trim(), password })
-    if (!error) return null
-    return /invalid login/i.test(error.message) ? 'signInFailed' : 'authFailed'
+    if (apiOrigin() === null) return 'syncUnconfigured'
+    try {
+      const session = await cloudSignIn(nextEmail, password)
+      tokenRef.current = session.token
+      setEmail(session.email)
+      return null
+    } catch {
+      return 'signInFailed'
+    }
   }
 
   async function signUp(nextEmail: string, password: string): Promise<string | null> {
-    const client = clientRef.current
-    if (!client) return 'syncUnconfigured'
-    const { data, error } = await client.auth.signUp({ email: nextEmail.trim(), password })
-    if (error) return 'authFailed'
-    if (!data.session) return 'signUpConfirm'
-    return null
+    if (apiOrigin() === null) return 'syncUnconfigured'
+    try {
+      const session = await cloudSignUp(nextEmail, password)
+      tokenRef.current = session.token
+      setEmail(session.email)
+      return null
+    } catch (error) {
+      return error instanceof Error && error.message === 'exists' ? 'authFailed' : 'authFailed'
+    }
   }
 
   async function signOut() {
-    await clientRef.current?.auth.signOut()
+    await cloudSignOut()
+    tokenRef.current = null
+    setEmail(null)
+    if (apiOrigin() !== null) setSyncStatus({ kind: 'signed-out' })
   }
 
   async function ask(question: string, history: LlmMessage[]): Promise<ChatResult> {
     const current = stateRef.current
     if (!current?.profile) throw new Error('no-books')
-    const env = readSupabaseEnv()
     const target = chatTarget({
       mode: import.meta.env.VITE_LLM_MODE,
-      proxyUrl: import.meta.env.VITE_AI_PROXY_URL,
-      supabaseUrl: env?.url,
-      anonKey: env?.anonKey,
+      apiUrl: import.meta.env.VITE_API_URL,
       accessToken: tokenRef.current,
       dev: import.meta.env.DEV,
     })
