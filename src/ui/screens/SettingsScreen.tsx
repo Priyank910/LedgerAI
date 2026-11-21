@@ -5,7 +5,7 @@ import { parseOpeningToPaise } from '../../domain/money'
 import { translate, type MessageKey } from '../../i18n'
 import { saveOrShare } from '../../export/share'
 import { useBooks, type SyncStatus } from '../books'
-import { LanguageSwitch } from './WelcomeScreen'
+import { LanguageSwitch, ThemeSwitch } from './WelcomeScreen'
 
 function syncText(status: SyncStatus, t: (key: MessageKey, vars?: Record<string, string | number>) => string): string {
   switch (status.kind) {
@@ -73,6 +73,7 @@ export function SettingsScreen() {
     <section className="page">
       <h1>{t('settings')}</h1>
       <LanguageSwitch />
+      <ThemeSwitch />
       <form
         className="block"
         onSubmit={(event) => {

@@ -4,8 +4,8 @@ const config: CapacitorConfig = {
   appId: 'com.ledgerai.shop',
   appName: 'Ledger AI',
   webDir: 'dist',
-  backgroundColor: '#14355c',
-  android: { backgroundColor: '#14355c' },
+  backgroundColor: '#f6b400',
+  android: { backgroundColor: '#f6b400' },
   server: { androidScheme: 'https' },
 }
 

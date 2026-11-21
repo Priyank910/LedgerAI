@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { CATEGORY_IDS } from '../../domain/types'
 import { shiftDay, shiftMonth, shiftYear, todayLocal } from '../../domain/dates'
-import { formatInr, formatInrPlain } from '../../domain/money'
+import { formatInrPlain } from '../../domain/money'
 import { balanceAsOf, periodTotals, resolvePeriod, transactionsInPeriod } from '../../domain/period'
 import type { Period, Transaction, TxType } from '../../domain/types'
 import { buildCsv } from '../../domain/csv'
@@ -9,6 +9,7 @@ import { buildStatementPdf, type PdfFonts } from '../../export/pdf'
 import { saveOrShare } from '../../export/share'
 import { categoryLabel, formatDate, formatDay, formatMonth, paymentLabel, translate, type MessageKey } from '../../i18n'
 import { useBooks } from '../books'
+import { MoneyFigure } from '../MoneyFigure'
 import { TxList } from '../TxList'
 
 type Kind = Period['kind']
@@ -199,15 +200,15 @@ export function LedgerScreen({ onAdd, onOpen }: { onAdd: (type: TxType) => void;
       <div className="totals">
         <p>
           <span>{t('income')}</span>
-          <strong>{formatInr(totals.incomePaise)}</strong>
+          <MoneyFigure paise={totals.incomePaise} />
         </p>
         <p>
           <span>{t('expense')}</span>
-          <strong>{formatInr(totals.expensePaise)}</strong>
+          <MoneyFigure paise={totals.expensePaise} />
         </p>
         <p>
           <span>{t('net')}</span>
-          <strong>{formatInr(totals.netPaise)}</strong>
+          <MoneyFigure paise={totals.netPaise} />
         </p>
       </div>
       <div className="row-2 export-row">

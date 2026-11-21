@@ -5,6 +5,7 @@ import { parseOpeningToPaise } from '../../domain/money'
 import { translate, type MessageKey } from '../../i18n'
 import type { Locale } from '../../domain/types'
 import { useBooks } from '../books'
+import { useTheme, type ThemeName } from '../theme'
 
 const locales: Locale[] = ['en', 'hi', 'gu']
 const localeName: Record<Locale, string> = { en: 'English', hi: 'हिन्दी', gu: 'ગુજરાતી' }
@@ -48,6 +49,7 @@ export function WelcomeScreen() {
   return (
     <main className="welcome">
       <LanguageSwitch />
+      <ThemeSwitch />
       <h1>{t('welcomeTitle')}</h1>
       <p className="lede">{t('welcomeBody')}</p>
       <form className="stack" onSubmit={start}>
@@ -119,6 +121,22 @@ export function WelcomeScreen() {
         )}
       </section>
     </main>
+  )
+}
+
+export function ThemeSwitch() {
+  const { state } = useBooks()
+  const { theme, choose } = useTheme()
+  const t = (key: MessageKey) => translate(state.locale, key)
+  const options: ThemeName[] = ['light', 'dark']
+  return (
+    <div className="choice" role="group" aria-label={t('theme')}>
+      {options.map((name) => (
+        <button key={name} type="button" aria-pressed={theme === name} onClick={() => choose(name)}>
+          {name === 'light' ? t('lightMode') : t('darkMode')}
+        </button>
+      ))}
+    </div>
   )
 }
 

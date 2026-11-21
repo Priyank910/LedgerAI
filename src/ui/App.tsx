@@ -85,7 +85,8 @@ function Shell() {
           </button>
         ))}
       </nav>
-      <div className="stage">
+      <div key={page} className="stage page-swap">
+        <div className="tape" aria-hidden="true" />
         {page === 'home' ? <HomeScreen onAdd={add} onLedger={() => go('ledger')} /> : null}
         {page === 'ledger' ? <LedgerScreen onAdd={add} onOpen={open} /> : null}
         {page === 'ask' ? <AskScreen /> : null}

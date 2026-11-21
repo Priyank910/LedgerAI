@@ -1,9 +1,9 @@
 import { formatDate, translate, type MessageKey } from '../../i18n'
 import { todayLocal } from '../../domain/dates'
-import { formatInr } from '../../domain/money'
 import { periodTotals, recentTransactions, resolvePeriod } from '../../domain/period'
 import type { TxType } from '../../domain/types'
 import { useBooks } from '../books'
+import { MoneyFigure } from '../MoneyFigure'
 import { TxList } from '../TxList'
 
 export function HomeScreen({ onAdd, onLedger }: { onAdd: (type: TxType) => void; onLedger: () => void }) {
@@ -30,7 +30,7 @@ export function HomeScreen({ onAdd, onLedger }: { onAdd: (type: TxType) => void;
         </div>
         <p className="balance-line">
           <span className="balance-caption">{t('balance')}</span>
-          <strong className="balance-num">{formatInr(balance)}</strong>
+          <MoneyFigure className="balance-num" paise={balance} />
         </p>
         <div className="band-actions">
           <button type="button" className="solid" onClick={() => onAdd('income')}>
@@ -46,30 +46,30 @@ export function HomeScreen({ onAdd, onLedger }: { onAdd: (type: TxType) => void;
         <div className="totals">
           <p>
             <span>{t('income')}</span>
-            <strong>{formatInr(todayTotals.incomePaise)}</strong>
+            <MoneyFigure paise={todayTotals.incomePaise} />
           </p>
           <p>
             <span>{t('expense')}</span>
-            <strong>{formatInr(todayTotals.expensePaise)}</strong>
+            <MoneyFigure paise={todayTotals.expensePaise} />
           </p>
           <p>
             <span>{t('net')}</span>
-            <strong>{formatInr(todayTotals.netPaise)}</strong>
+            <MoneyFigure paise={todayTotals.netPaise} />
           </p>
         </div>
         <h2>{t('thisMonth')}</h2>
         <div className="totals">
           <p>
             <span>{t('income')}</span>
-            <strong>{formatInr(monthTotals.incomePaise)}</strong>
+            <MoneyFigure paise={monthTotals.incomePaise} />
           </p>
           <p>
             <span>{t('expense')}</span>
-            <strong>{formatInr(monthTotals.expensePaise)}</strong>
+            <MoneyFigure paise={monthTotals.expensePaise} />
           </p>
           <p>
             <span>{t('net')}</span>
-            <strong>{formatInr(monthTotals.netPaise)}</strong>
+            <MoneyFigure paise={monthTotals.netPaise} />
           </p>
         </div>
       </section>

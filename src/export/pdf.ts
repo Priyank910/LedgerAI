@@ -36,13 +36,13 @@ export type StatementRow = {
 
 type Script = 'latin' | 'gujarati' | 'devanagari'
 
-const indigo = rgb(20 / 255, 53 / 255, 92 / 255)
-const ink = rgb(16 / 255, 32 / 255, 51 / 255)
-const chalk = rgb(247 / 255, 251 / 255, 255 / 255)
-const paper = rgb(244 / 255, 247 / 255, 251 / 255)
-const incomeColor = rgb(12 / 255, 92 / 255, 69 / 255)
-const expenseColor = rgb(142 / 255, 30 / 255, 30 / 255)
-const rule = rgb(183 / 255, 198 / 255, 214 / 255)
+const marigold = rgb(246 / 255, 180 / 255, 0)
+const ink = rgb(20 / 255, 20 / 255, 20 / 255)
+const onBand = rgb(20 / 255, 20 / 255, 20 / 255)
+const paper = rgb(1, 1, 1)
+const incomeColor = ink
+const expenseColor = ink
+const rule = rgb(214 / 255, 214 / 255, 214 / 255)
 
 function isJoiner(code: number): boolean {
   return code === 0x200c || code === 0x200d || (code >= 0xfe00 && code <= 0xfe0f)
@@ -143,9 +143,9 @@ export async function buildStatementPdf(
 
   const paintPage = (continued: boolean) => {
     page.drawRectangle({ x: 0, y: 0, width: pageWidth, height: pageHeight, color: paper })
-    page.drawRectangle({ x: 0, y: pageHeight - (continued ? 48 : 78), width: pageWidth, height: continued ? 48 : 78, color: indigo })
-    drawRuns(page, input.shopName, margin, pageHeight - (continued ? 30 : 36), continued ? 14 : 20, fonts, chalk)
-    if (!continued) drawRuns(page, input.periodLabel, margin, pageHeight - 60, 12, fonts, chalk)
+    page.drawRectangle({ x: 0, y: pageHeight - (continued ? 48 : 78), width: pageWidth, height: continued ? 48 : 78, color: marigold })
+    drawRuns(page, input.shopName, margin, pageHeight - (continued ? 30 : 36), continued ? 14 : 20, fonts, onBand)
+    if (!continued) drawRuns(page, input.periodLabel, margin, pageHeight - 60, 12, fonts, onBand)
     y = pageHeight - (continued ? 72 : 104)
   }
 
@@ -169,8 +169,8 @@ export async function buildStatementPdf(
   const columns = [margin, 100, 268, 346, pageWidth - margin - 78, pageWidth - margin]
   const header = [input.labels.date, input.labels.description, input.labels.category, input.labels.payment, input.labels.income, input.labels.expense]
   header.forEach((label, index) => {
-    if (index >= 4) drawRight(page, label, columns[index] ?? 0, y, 10, fonts, indigo)
-    else drawRuns(page, label, columns[index] ?? margin, y, 10, fonts, indigo)
+    if (index >= 4) drawRight(page, label, columns[index] ?? 0, y, 10, fonts, ink)
+    else drawRuns(page, label, columns[index] ?? margin, y, 10, fonts, ink)
   })
   y -= 16
 
@@ -197,6 +197,6 @@ export async function buildStatementPdf(
     y -= 6
   }
 
-  drawRuns(page, input.generatedLabel, margin, 24, 9, fonts, indigo)
+  drawRuns(page, input.generatedLabel, margin, 24, 9, fonts, ink)
   return pdf.save()
 }
