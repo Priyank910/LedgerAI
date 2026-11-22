@@ -11,6 +11,7 @@ describe('chat target', () => {
       url: 'https://ledger.example.workers.dev/api/ai-chat',
       headers: { Authorization: 'Bearer session-token' },
     })
+    expect(JSON.stringify(hosted)).not.toContain('OPENROUTER')
     expect(JSON.stringify(hosted)).not.toContain('GEMINI')
     expect(chatTarget({ mode: '', apiUrl: '', accessToken: null, dev: false }).kind).toBe('unavailable')
   })

@@ -1,4 +1,6 @@
-import { completeWithGemini, type GeminiLocale, type GeminiMessage, type GeminiTool } from '../src/llm/gemini'
+import type { LlmMessage } from '../src/domain/ai/loop'
+import type { ToolSpec } from '../src/domain/ai/tools'
+import { DEFAULT_OPENROUTER_MODEL, OpenRouterProvider } from '../src/llm/openrouter'
 import type { Profile, Transaction } from '../src/domain/types'
 import { bearerToken, hashPassword, newToken, sessionExpiry, tokenHash, verifyPassword } from './auth'
 import type { AuthStore, LedgerStore } from './store'
@@ -6,8 +8,8 @@ import type { AuthStore, LedgerStore } from './store'
 export type WorkerDeps = {
   auth: AuthStore
   ledger: LedgerStore
-  geminiKey?: string
-  geminiModel?: string
+  openRouterKey?: string
+  openRouterModel?: string
   fetchImpl?: typeof fetch
   now?: () => string
 }
@@ -126,25 +128,27 @@ export async function handleRequest(request: Request, deps: WorkerDeps): Promise
   }
 
   if (path === '/api/ai-chat' && request.method === 'POST') {
-    if (!deps.geminiKey) return json({ error: 'server-not-configured' }, 503, origin)
+    if (!deps.openRouterKey) return json({ error: 'server-not-configured' }, 503, origin)
     const body = await readJson(request)
     const locale = body?.locale
     if (!body || (locale !== 'en' && locale !== 'hi' && locale !== 'gu') || typeof body.today !== 'string' || !Array.isArray(body.messages) || !Array.isArray(body.tools)) {
       return json({ error: 'bad-body' }, 400, origin)
     }
     try {
-      const result = await completeWithGemini({
-        apiKey: deps.geminiKey,
-        model: deps.geminiModel || 'gemini-2.5-flash',
-        locale: locale as GeminiLocale,
-        today: body.today,
-        messages: body.messages as GeminiMessage[],
-        tools: body.tools as GeminiTool[],
+      const provider = new OpenRouterProvider({
+        apiKey: deps.openRouterKey,
+        model: deps.openRouterModel || DEFAULT_OPENROUTER_MODEL,
         ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}),
+      })
+      const result = await provider.complete({
+        locale,
+        today: body.today,
+        messages: body.messages as LlmMessage[],
+        tools: body.tools as ToolSpec[],
       })
       return json(result, 200, origin)
     } catch (error) {
-      return json({ error: error instanceof Error ? error.message : 'gemini-failed' }, 502, origin)
+      return json({ error: error instanceof Error ? error.message : 'openrouter-failed' }, 502, origin)
     }
   }
 

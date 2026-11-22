@@ -8,7 +8,7 @@ import type { Profile, Transaction } from '../src/domain/types'
 const now = '2026-11-21T00:00:00.000Z'
 
 function deps() {
-  return { auth: new MemoryAuth(), ledger: new MemoryLedger(), now: () => now, geminiKey: 'secret-key', geminiModel: 'gemini-2.5-flash' }
+  return { auth: new MemoryAuth(), ledger: new MemoryLedger(), now: () => now, openRouterKey: 'secret-key', openRouterModel: 'google/gemini-2.5-flash' }
 }
 
 async function post(path: string, body: unknown, token?: string, extra?: Parameters<typeof handleRequest>[1]) {
@@ -116,17 +116,21 @@ describe('worker auth and sync', () => {
       }),
       {
         ...store,
-        fetchImpl: async (_url, init) => {
-          seenKey = new Headers(init?.headers).get('x-goog-api-key') ?? ''
+        fetchImpl: async (url, init) => {
+          const headers = new Headers(init?.headers)
+          seenKey = headers.get('authorization') ?? ''
+          expect(String(url)).toBe('https://openrouter.ai/api/v1/chat/completions')
+          expect(headers.get('http-referer')).toBe('https://github.com/Priyank910/LedgerAI')
+          expect(headers.get('x-title')).toBe('Ledger AI')
           expect(String(init?.body)).not.toContain('secret-key')
-          return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'જોયું' }] } }] }))
+          return new Response(JSON.stringify({ choices: [{ message: { content: 'જોયું' } }] }))
         },
       },
     )
     const body = (await response.json()) as { text?: string; error?: string }
     expect(response.status).toBe(200)
     expect(body.text).toBe('જોયું')
-    expect(seenKey).toBe('secret-key')
+    expect(seenKey).toBe('Bearer secret-key')
     expect(JSON.stringify(body)).not.toContain('secret-key')
   })
 

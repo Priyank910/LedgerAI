@@ -148,7 +148,7 @@ function sentence(
   return `${period}: income ${income}, expenses ${expense}, net ${net}.`
 }
 
-/** Offline stand-in for Gemini. It only understands a small phrase list, and every figure comes from a tool. */
+/** Offline stand-in. It only understands a small phrase list, and every figure comes from a tool. */
 export class PhraseProvider implements LlmProvider {
   async complete(request: LlmRequest): Promise<LlmResponse> {
     const last = request.messages[request.messages.length - 1]

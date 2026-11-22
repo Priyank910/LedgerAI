@@ -1,0 +1,140 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, for example v0.1.0. Leave empty to use v0.0.0-ci.<run number>."
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  VITE_API_URL: ${{ vars.VITE_API_URL || secrets.VITE_API_URL }}
+  RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || (github.event.inputs.tag || format('v0.0.0-ci.{0}', github.run_number)) }}
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+      - name: Require the Worker URL
+        run: |
+          if [ -z "$VITE_API_URL" ]; then
+            echo "Set the VITE_API_URL repository variable to the deployed Worker URL (https://ledger-ai.<account>.workers.dev)."
+            exit 1
+          fi
+      - name: Install Android SDK 36
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
+      - run: npm ci
+      - name: Build the web bundle
+        run: npm run build
+      - name: Sync Capacitor
+        run: npx cap sync android
+      - name: Prepare the release keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keystore="$GITHUB_WORKSPACE/android/app/release.keystore"
+          if [ -n "${ANDROID_KEYSTORE_BASE64}" ]; then
+            echo "Signing with the release keystore from repository secrets."
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$keystore"
+            alias="${ANDROID_KEY_ALIAS:?Set ANDROID_KEY_ALIAS with the keystore secret.}"
+            store_pass="${ANDROID_KEYSTORE_PASSWORD:?Set ANDROID_KEYSTORE_PASSWORD with the keystore secret.}"
+            key_pass="${ANDROID_KEY_PASSWORD:?Set ANDROID_KEY_PASSWORD with the keystore secret.}"
+          else
+            echo "No ANDROID_KEYSTORE_BASE64 secret. Generating a throwaway keystore for this run."
+            alias="ledger"
+            store_pass="ci-keystore-pass"
+            key_pass="ci-keystore-pass"
+            keytool -genkeypair -v \
+              -keystore "$keystore" \
+              -storepass "$store_pass" \
+              -keypass "$key_pass" \
+              -alias "$alias" \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Ledger AI CI, OU=Ledger AI, O=Ledger AI, L=Ahmedabad, ST=Gujarat, C=IN"
+          fi
+          {
+            echo "ANDROID_KEYSTORE_FILE=$keystore"
+            echo "ANDROID_KEYSTORE_PASSWORD=$store_pass"
+            echo "ANDROID_KEY_ALIAS=$alias"
+            echo "ANDROID_KEY_PASSWORD=$key_pass"
+          } >> "$GITHUB_ENV"
+      - name: Assemble the release APK
+        working-directory: android
+        run: chmod +x ./gradlew && ./gradlew assembleRelease --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Require the Worker URL
+        shell: bash
+        run: |
+          if [ -z "$VITE_API_URL" ]; then
+            echo "Set the VITE_API_URL repository variable to the deployed Worker URL (https://ledger-ai.<account>.workers.dev)."
+            exit 1
+          fi
+      - run: npm ci
+      - name: Build the NSIS and MSI installers
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VITE_API_URL: ${{ env.VITE_API_URL }}
+        with:
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: Ledger AI ${{ env.RELEASE_TAG }}
+          releaseDraft: false
+          prerelease: true
+          args: --bundles nsis,msi
+
+  publish-apk:
+    needs: [android, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: apk
+      - name: Attach the APK to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Ledger AI ${{ env.RELEASE_TAG }}
+          draft: false
+          prerelease: true
+          files: apk/*.apk
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

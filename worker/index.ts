@@ -3,8 +3,8 @@ import { handleRequest } from './http'
 
 export interface Env {
   DB: D1Like
-  GEMINI_API_KEY?: string
-  GEMINI_MODEL?: string
+  OPENROUTER_API_KEY?: string
+  OPENROUTER_MODEL?: string
 }
 
 export default {
@@ -12,8 +12,8 @@ export default {
     return handleRequest(request, {
       auth: new D1Auth(env.DB),
       ledger: new D1Ledger(env.DB),
-      ...(env.GEMINI_API_KEY ? { geminiKey: env.GEMINI_API_KEY } : {}),
-      ...(env.GEMINI_MODEL ? { geminiModel: env.GEMINI_MODEL } : {}),
+      ...(env.OPENROUTER_API_KEY ? { openRouterKey: env.OPENROUTER_API_KEY } : {}),
+      ...(env.OPENROUTER_MODEL ? { openRouterModel: env.OPENROUTER_MODEL } : {}),
     })
   },
 }

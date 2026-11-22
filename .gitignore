@@ -11,6 +11,9 @@ android/.gradle
 android/app/build
 android/build
 android/local.properties
+android/keystore.properties
+android/**/*.keystore
+android/**/*.jks
 android/capacitor-cordova-android-plugins
 android/app/src/main/assets/public
 android/app/src/main/assets/capacitor.config.json
