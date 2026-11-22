@@ -211,6 +211,13 @@ export async function streamReleaseAsset(input: {
   })
 }
 
+function noRelease(): Response {
+  return new Response(null, {
+    status: 204,
+    headers: { 'access-control-allow-origin': '*', 'cache-control': 'no-store' },
+  })
+}
+
 function jsonRelease(body: unknown, status: number, origin: string | null): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -247,15 +254,15 @@ export async function handleReleaseRequest(request: Request, deps: {
   const release = releases ? pickRelease(releases) : null
   if (url.pathname === '/app/latest') {
     const platform = url.searchParams.get('platform')
-    if (!release) return new Response(null, { status: 204, headers: { 'access-control-allow-origin': '*' } })
+    if (!release) return noRelease()
     if (platform === 'android') {
       const body = androidRelease(release, url.origin)
-      if (!body) return new Response(null, { status: 204, headers: { 'access-control-allow-origin': '*' } })
+      if (!body) return noRelease()
       return jsonRelease(body, 200, originHeader)
     }
     if (platform === 'windows') {
       const manifest = await windowsManifest({ release, origin: url.origin, fetchImpl, ...(deps.githubToken ? { token: deps.githubToken } : {}) })
-      if (!manifest) return new Response(null, { status: 204, headers: { 'access-control-allow-origin': '*' } })
+      if (!manifest) return noRelease()
       return jsonRelease(manifest, 200, originHeader)
     }
     return jsonRelease({ error: 'bad-platform' }, 400, originHeader)
