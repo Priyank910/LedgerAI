@@ -123,6 +123,22 @@ describe('release proxy', () => {
     expect(await response.json()).toEqual({ error: 'github-unreachable' })
   })
 
+  it('does not cache an empty release list', async () => {
+    let calls = 0
+    const cache = new MemoryReleaseCache(() => Date.parse('2026-11-22T00:00:00Z'))
+    const fetchImpl: typeof fetch = async () => {
+      calls += 1
+      return new Response(calls === 1 ? '[]' : JSON.stringify([release('v0.1.0')]))
+    }
+    const store = deps(fetchImpl, cache)
+    const first = await handleRequest(new Request('https://ledger.test/app/latest?platform=android'), store)
+    expect(first.status).toBe(204)
+    const second = await handleRequest(new Request('https://ledger.test/app/latest?platform=android'), store)
+    const body = (await second.json()) as { version: string }
+    expect(body.version).toBe('0.1.0')
+    expect(calls).toBe(2)
+  })
+
   it('signs Android releases as PKCS12', () => {
     const gradle = readFileSync('android/app/build.gradle', 'utf8')
     expect(gradle).toContain("storeType 'PKCS12'")

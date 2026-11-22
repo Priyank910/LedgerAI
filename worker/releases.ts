@@ -127,7 +127,9 @@ export async function loadReleases(input: {
     const row = item as GhRelease
     return typeof row.tag_name === 'string' && Array.isArray(row.assets)
   })
-  await input.cache.set('releases', JSON.stringify(releases), RELEASE_CACHE_MS)
+  // An empty list is what GitHub returns before the release exists. Caching it
+  // hides a prerelease that appears a few seconds later.
+  if (pickRelease(releases)) await input.cache.set('releases', JSON.stringify(releases), RELEASE_CACHE_MS)
   return releases
 }
 
