@@ -131,6 +131,22 @@ export async function loadReleases(input: {
   return releases
 }
 
+function assetFetchUrls(asset: ReleaseAsset, token?: string): string[] {
+  return token ? [asset.url, asset.browser_download_url] : [asset.browser_download_url, asset.url]
+}
+
+async function readAssetText(fetchImpl: typeof fetch, asset: ReleaseAsset, token?: string): Promise<string | null> {
+  for (const url of assetFetchUrls(asset, token)) {
+    try {
+      const response = await fetchImpl(url, { headers: githubHeaders(token, 'application/octet-stream') })
+      if (response.ok) return await response.text()
+    } catch {
+      continue
+    }
+  }
+  return null
+}
+
 export async function windowsManifest(input: {
   release: GhRelease
   origin: string
@@ -139,24 +155,28 @@ export async function windowsManifest(input: {
 }): Promise<Record<string, unknown> | null> {
   const latest = input.release.assets.find((asset) => asset.name === 'latest.json')
   if (latest) {
-    const response = await input.fetchImpl(latest.url, { headers: githubHeaders(input.token, 'application/octet-stream') })
-    if (response.ok) {
-      const rewritten = rewriteUpdaterManifest(await readJson(response), input.origin)
-      if (rewritten) return rewritten
+    const text = await readAssetText(input.fetchImpl, latest, input.token)
+    if (text) {
+      try {
+        const rewritten = rewriteUpdaterManifest(JSON.parse(text) as unknown, input.origin)
+        if (rewritten) return rewritten
+      } catch {
+        // Fall through to the installer and its signature file.
+      }
     }
   }
   const installer = input.release.assets.find((asset) => asset.name.endsWith('.exe') && !asset.name.endsWith('.sig'))
   const signature = input.release.assets.find((asset) => asset.name === `${installer?.name ?? ''}.sig`)
   if (!installer || !signature) return null
-  const signatureResponse = await input.fetchImpl(signature.url, { headers: githubHeaders(input.token, 'application/octet-stream') })
-  if (!signatureResponse.ok) return null
+  const signatureText = await readAssetText(input.fetchImpl, signature, input.token)
+  if (!signatureText) return null
   const version = versionOf(input.release)
   return {
     version: version.version,
     notes: input.release.body ?? '',
     pub_date: input.release.published_at ?? new Date(0).toISOString(),
     platforms: {
-      'windows-x86_64': { signature: await signatureResponse.text(), url: downloadUrl(input.origin, installer.name) },
+      'windows-x86_64': { signature: signatureText, url: downloadUrl(input.origin, installer.name) },
     },
   }
 }
@@ -170,7 +190,7 @@ export async function streamReleaseAsset(input: {
 }): Promise<Response> {
   const asset = input.release.assets.find((item) => item.name === input.fileName)
   if (!asset) return jsonRelease({ error: 'not-found' }, 404, input.originHeader)
-  const upstream = await input.fetchImpl(asset.url, {
+  const upstream = await input.fetchImpl(assetFetchUrls(asset, input.token)[0], {
     headers: githubHeaders(input.token, 'application/octet-stream'),
     redirect: 'manual',
   })
