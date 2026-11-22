@@ -105,38 +105,24 @@ jobs:
           fi
           python - << 'PY'
           import base64, os
-          raw = os.environ["TAURI_SIGNING_PRIVATE_KEY"]
-          raw = raw.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\r\n", "\n").replace("\r", "\n")
-          decoded = False
-          if not raw.strip().startswith("untrusted"):
-              try:
-                  text = base64.b64decode(raw.strip(), validate=False).decode("utf-8")
-              except Exception:
-                  text = ""
-              if "untrusted" in text:
-                  raw = text.replace("\r\n", "\n").replace("\r", "\n")
-                  decoded = True
-          pieces = [line.strip() for line in raw.splitlines() if line.strip()]
-          key_line = next((line for line in pieces if " " not in line and len(line) > 40), "")
-          comment = next((line for line in pieces if line.startswith("untrusted")), "untrusted comment: minisign encrypted secret key")
-          if key_line:
-              raw = comment + "\n" + key_line + "\n"
-          elif not raw.endswith("\n"):
-              raw += "\n"
-          path = os.path.join(os.environ["RUNNER_TEMP"], "updater.key")
-          with open(path, "w", newline="\n") as handle:
-              handle.write(raw)
-          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as handle:
-              handle.write(f"TAURI_KEY_FILE={path}\n")
-          second = raw.splitlines()[1] if len(raw.splitlines()) > 1 else ""
-          print(f"updater key lines={raw.count(chr(10))} decoded_base64={decoded} starts_untrusted={raw.startswith('untrusted')} key_len={len(second)} key_has_space={' ' in second}")
+          raw = os.environ["TAURI_SIGNING_PRIVATE_KEY"].strip()
+          try:
+              text = base64.b64decode(raw).decode("utf-8")
+          except Exception:
+              text = raw
+          lengths = [len(line.strip()) for line in text.splitlines() if line.strip() and " " not in line]
+          key_len = max(lengths, default=len(raw))
+          print(f"updater private key material length={key_len}")
+          if key_len < 80:
+              print("TAURI_SIGNING_PRIVATE_KEY is the public key. Replace it with the private key printed by `tauri signer generate`. The public key already belongs in tauri.conf.json.")
+              raise SystemExit(1)
           PY
       - name: Build the NSIS and MSI installers
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_API_URL: ${{ env.VITE_API_URL }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ env.TAURI_KEY_FILE }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ env.RELEASE_TAG }}
