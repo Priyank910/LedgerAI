@@ -199,6 +199,11 @@ function jsonRelease(body: unknown, status: number, origin: string | null): Resp
   })
 }
 
+function workerFetch(fetchImpl?: typeof fetch): typeof fetch {
+  if (fetchImpl) return fetchImpl
+  return (input, init) => fetch(input, init)
+}
+
 export async function handleReleaseRequest(request: Request, deps: {
   githubToken?: string
   fetchImpl?: typeof fetch
@@ -207,7 +212,7 @@ export async function handleReleaseRequest(request: Request, deps: {
 }): Promise<Response> {
   const originHeader = request.headers.get('origin')
   const url = new URL(request.url)
-  const fetchImpl = deps.fetchImpl ?? fetch
+  const fetchImpl = workerFetch(deps.fetchImpl)
   const now = Date.parse(deps.now?.() ?? '') || Date.now()
   const cache = deps.releaseCache ?? new MemoryReleaseCache(() => now)
   let releases: GhRelease[] | null
