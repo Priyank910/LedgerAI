@@ -116,11 +116,11 @@ jobs:
               if "untrusted" in text:
                   raw = text.replace("\r\n", "\n").replace("\r", "\n")
                   decoded = True
-          if raw.count("\n") <= 1 and raw.strip().startswith("untrusted"):
-              parts = raw.strip().split(" ")
+          if "\n" not in raw and raw.startswith("untrusted"):
+              parts = raw.split(" ")
               for index, part in enumerate(parts):
                   if len(part) > 40:
-                      raw = " ".join(parts[:index]) + "\n" + "".join(parts[index:]) + "\n"
+                      raw = " ".join(parts[:index]) + "\n" + part + "\n"
                       break
           if not raw.endswith("\n"):
               raw += "\n"
