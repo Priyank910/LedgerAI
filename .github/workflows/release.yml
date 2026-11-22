@@ -116,20 +116,20 @@ jobs:
               if "untrusted" in text:
                   raw = text.replace("\r\n", "\n").replace("\r", "\n")
                   decoded = True
-          if "\n" not in raw and raw.startswith("untrusted"):
-              parts = raw.split(" ")
-              for index, part in enumerate(parts):
-                  if len(part) > 40:
-                      raw = " ".join(parts[:index]) + "\n" + part + "\n"
-                      break
-          if not raw.endswith("\n"):
+          pieces = [line.strip() for line in raw.splitlines() if line.strip()]
+          key_line = next((line for line in pieces if " " not in line and len(line) > 40), "")
+          comment = next((line for line in pieces if line.startswith("untrusted")), "untrusted comment: minisign encrypted secret key")
+          if key_line:
+              raw = comment + "\n" + key_line + "\n"
+          elif not raw.endswith("\n"):
               raw += "\n"
           path = os.path.join(os.environ["RUNNER_TEMP"], "updater.key")
           with open(path, "w", newline="\n") as handle:
               handle.write(raw)
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as handle:
               handle.write(f"TAURI_KEY_FILE={path}\n")
-          print(f"updater key lines={raw.count(chr(10))} decoded_base64={decoded} starts_untrusted={raw.startswith('untrusted')}")
+          second = raw.splitlines()[1] if len(raw.splitlines()) > 1 else ""
+          print(f"updater key lines={raw.count(chr(10))} decoded_base64={decoded} starts_untrusted={raw.startswith('untrusted')} key_len={len(second)} key_has_space={' ' in second}")
           PY
       - name: Build the NSIS and MSI installers
         uses: tauri-apps/tauri-action@v0
