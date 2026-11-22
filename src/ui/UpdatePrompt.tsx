@@ -6,7 +6,7 @@ import { translate, type MessageKey } from '../i18n'
 import { useBooks } from './books'
 
 const LATER_KEY = 'ledger-ai-update-later'
-const UPDATE_ORIGIN = 'https://ledger-ai.promptlab-ai.workers.dev'
+const UPDATE_ORIGIN = 'https://ledger-ai.priyank-chavda.workers.dev'
 
 type Offer = {
   version: string

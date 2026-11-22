@@ -64,7 +64,7 @@ Copy `.env.example`. Do not commit `.env`.
 
 | Name | Where it is read | Purpose |
 | --- | --- | --- |
-| `VITE_API_URL` | app | Worker origin. The default in `.env.example` and in release builds is `https://ledger-ai.promptlab-ai.workers.dev`. A repository variable or secret of the same name overrides the release build. Clear it for `npm run dev`, which proxies `/api` to wrangler on port 8787. |
+| `VITE_API_URL` | app | Worker origin. The default in `.env.example` and in release builds is `https://ledger-ai.priyank-chavda.workers.dev`. A repository variable or secret of the same name overrides the release build. Clear it for `npm run dev`, which proxies `/api` to wrangler on port 8787. |
 | `VITE_LLM_MODE` | app | Set to `mock` for the on-device phrase tool-caller. Leave empty in production. |
 | `OPENROUTER_API_KEY` | Worker secret only | OpenRouter key. Put it in `.dev.vars` for local wrangler and `wrangler secret put` for production. No `VITE_` prefix, so it is never bundled into the Android or Windows app. |
 | `OPENROUTER_MODEL` | Worker var | Defaults to `google/gemini-2.5-flash` in `wrangler.toml`. That model accepts tool calls and replies in Hindi and Gujarati. Change the var and redeploy to use another OpenRouter model. |
@@ -85,7 +85,7 @@ npx wrangler d1 migrations apply ledger-ai --remote
 
 5. Copy `.dev.vars.example` to `.dev.vars` and set `OPENROUTER_API_KEY` for local runs. For the deployed Worker: `npx wrangler secret put OPENROUTER_API_KEY`.
 6. Deploy: `npm run worker:deploy` (this runs `wrangler deploy`). Wrangler prints the URL, shaped like `https://ledger-ai.<account>.workers.dev`. The same deploy also runs from GitHub Actions once the secrets below are set.
-7. The Worker URL is `https://ledger-ai.promptlab-ai.workers.dev`. That value is the default for `VITE_API_URL` in `.env.example` and in the release workflow. Set the repository variable only to point a release at a different Worker. The OpenRouter key is not baked in.
+7. The Worker URL is `https://ledger-ai.priyank-chavda.workers.dev`. That value is the default for `VITE_API_URL` in `.env.example` and in the release workflow. Set the repository variable only to point a release at a different Worker. The OpenRouter key is not baked in.
 
 Local development is two processes. `npm run worker:dev` starts the Worker on http://127.0.0.1:8787 with Miniflare and the local D1 file. `npm run dev` proxies `/api` to that port. Leave `VITE_API_URL` empty while you do this.
 
@@ -160,7 +160,7 @@ Nothing else is billed if you stay on the free tiers above.
 4. Nothing else for the database id. `CLOUDFLARE_D1_DATABASE_ID` is optional and overrides the committed id when set.
 5. An OpenRouter API key from https://openrouter.ai/keys, stored with `npx wrangler secret put OPENROUTER_API_KEY`. For local wrangler, the same key in `.dev.vars`.
 6. `npm run worker:deploy`, or the Deploy Worker GitHub Action after the secrets in the next section are set.
-7. Nothing else for the app URL. Release builds default to `https://ledger-ai.promptlab-ai.workers.dev`. Set `VITE_API_URL` only to override that.
+7. Nothing else for the app URL. Release builds default to `https://ledger-ai.priyank-chavda.workers.dev`. Set `VITE_API_URL` only to override that.
 8. Optional: change `OPENROUTER_MODEL` in `wrangler.toml` if `google/gemini-2.5-flash` is not the model you want. Keep a model that supports tool calling.
 9. An Android PKCS12 keystore in `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (`ledgerai`), and `ANDROID_KEY_PASSWORD`. The release workflow stops if any of these are missing.
 10. `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, the minisign key that matches the updater public key in `src-tauri/tauri.conf.json`. The Windows job stops if either is missing.
@@ -173,7 +173,7 @@ A `v*` tag builds the Android APK and the Windows installers. The OpenRouter key
 
 You do not need a local Android SDK or a Windows PC.
 
-- `.github/workflows/release.yml` runs on a tag `v*` and on **Run workflow** once the file is on `main`. It builds a signed release APK on Ubuntu and the NSIS `.exe` and `.msi` on `windows-latest` (`tauri-apps/tauri-action`). Both bake `VITE_API_URL` from the repository variable, then a secret of the same name, then `https://ledger-ai.promptlab-ai.workers.dev`. The workflow uploads them to a GitHub Release with `draft: false` and `prerelease: true`. A manual run with no tag uses `v0.0.0-ci.<run number>`.
+- `.github/workflows/release.yml` runs on a tag `v*` and on **Run workflow** once the file is on `main`. It builds a signed release APK on Ubuntu and the NSIS `.exe` and `.msi` on `windows-latest` (`tauri-apps/tauri-action`). Both bake `VITE_API_URL` from the repository variable, then a secret of the same name, then `https://ledger-ai.priyank-chavda.workers.dev`. The workflow uploads them to a GitHub Release with `draft: false` and `prerelease: true`. A manual run with no tag uses `v0.0.0-ci.<run number>`.
 - The release fails without `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (`ledgerai`), and `ANDROID_KEY_PASSWORD`. The keystore is PKCS12 (`storeType` PKCS12). The same job fails without `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Tauri action signs the Windows installers and uploads `latest.json`.
 - On launch, and again every four hours, the app asks the Worker `GET /app/latest`. Windows uses the Tauri updater against that endpoint. Android downloads the APK and opens the system installer (`REQUEST_INSTALL_PACKAGES`, FileProvider). The dialog explains the one-time “install unknown apps” permission. If that install fails, the release page opens in the browser. The apps do not call `api.github.com`. The Worker uses `GITHUB_RELEASES_TOKEN` when it is set, and the public API otherwise. Release info is cached for about 10 minutes. Prereleases are included.
 - `.github/workflows/deploy-worker.yml` runs on a tag `v*`, on **Run workflow** once the file is on `main`, and on a push to `main` that touches `worker/`, `migrations/`, or `wrangler.toml`. It uses `wrangler.toml`’s database id unless `CLOUDFLARE_D1_DATABASE_ID` is set. It applies D1 migrations with `--remote`, runs `wrangler deploy`, then sets the `OPENROUTER_API_KEY` Worker secret from stdin with `wrangler secret put`. If `GITHUB_RELEASES_TOKEN` is set, that secret is written the same way. Each secret is live as soon as its command finishes.
