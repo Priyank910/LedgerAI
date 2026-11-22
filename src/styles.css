@@ -392,6 +392,37 @@ input, select {
   button { transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease; }
 }
 
+.update-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(14 14 14 / 55%);
+}
+.update-card {
+  width: min(100%, 28rem);
+  background: var(--sheet);
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+  border-radius: 24px;
+  padding: 1.2rem;
+  box-shadow: 4px 12px 28px rgb(20 20 20 / 18%);
+}
+.update-card h2, .update-card h3 { margin: 0; }
+.update-version { margin: 0.35rem 0 0.8rem; font-weight: 700; }
+.update-notes {
+  max-height: 10rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  margin: 0.4rem 0 0.9rem;
+}
+.update-track { height: 0.7rem; border-radius: 999px; background: var(--track); overflow: hidden; }
+.update-track span { display: block; height: 100%; background: var(--marigold); }
+.update-progress p { margin: 0 0 0.4rem; font-weight: 700; }
+.update-card .row-2 { margin-top: 0.4rem; }
+
 button:disabled {
   background: var(--track);
   color: var(--ink-soft);

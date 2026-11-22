@@ -41,6 +41,8 @@ jobs:
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
       - run: npm ci
+      - name: Set the app version from the tag
+        run: node scripts/set-release-version.mjs "$RELEASE_TAG"
       - name: Build the web bundle
         run: npm run build
       - name: Sync Capacitor
@@ -54,25 +56,16 @@ jobs:
         run: |
           set -euo pipefail
           keystore="$GITHUB_WORKSPACE/android/app/release.keystore"
-          if [ -n "${ANDROID_KEYSTORE_BASE64}" ]; then
-            echo "Signing with the release keystore from repository secrets."
-            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$keystore"
-            alias="${ANDROID_KEY_ALIAS:?Set ANDROID_KEY_ALIAS with the keystore secret.}"
-            store_pass="${ANDROID_KEYSTORE_PASSWORD:?Set ANDROID_KEYSTORE_PASSWORD with the keystore secret.}"
-            key_pass="${ANDROID_KEY_PASSWORD:?Set ANDROID_KEY_PASSWORD with the keystore secret.}"
-          else
-            echo "No ANDROID_KEYSTORE_BASE64 secret. Generating a throwaway keystore for this run."
-            alias="ledger"
-            store_pass="ci-keystore-pass"
-            key_pass="ci-keystore-pass"
-            keytool -genkeypair -v \
-              -keystore "$keystore" \
-              -storepass "$store_pass" \
-              -keypass "$key_pass" \
-              -alias "$alias" \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -dname "CN=Ledger AI CI, OU=Ledger AI, O=Ledger AI, L=Ahmedabad, ST=Gujarat, C=IN"
+          if [ -z "${ANDROID_KEYSTORE_BASE64}" ] || [ -z "${ANDROID_KEYSTORE_PASSWORD}" ] || [ -z "${ANDROID_KEY_ALIAS}" ] || [ -z "${ANDROID_KEY_PASSWORD}" ]; then
+            echo "Set ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD."
+            echo "The keystore is PKCS12. ANDROID_KEY_ALIAS for this shop is ledgerai."
+            exit 1
           fi
+          echo "Signing with the PKCS12 release keystore from repository secrets."
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$keystore"
+          alias="$ANDROID_KEY_ALIAS"
+          store_pass="$ANDROID_KEYSTORE_PASSWORD"
+          key_pass="$ANDROID_KEY_PASSWORD"
           {
             echo "ANDROID_KEYSTORE_FILE=$keystore"
             echo "ANDROID_KEYSTORE_PASSWORD=$store_pass"
@@ -101,16 +94,32 @@ jobs:
         shell: bash
         run: echo "VITE_API_URL=$VITE_API_URL"
       - run: npm ci
+      - name: Set the app version from the tag
+        shell: bash
+        run: node scripts/set-release-version.mjs "$RELEASE_TAG"
+      - name: Require the updater signing key
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ] || [ -z "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" ]; then
+            echo "Set TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD so the Windows update can be signed."
+            exit 1
+          fi
       - name: Build the NSIS and MSI installers
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_API_URL: ${{ env.VITE_API_URL }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: Ledger AI ${{ env.RELEASE_TAG }}
           releaseDraft: false
           prerelease: true
+          includeUpdaterJson: true
           args: --bundles nsis,msi
 
   publish-apk:

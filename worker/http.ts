@@ -3,6 +3,7 @@ import type { ToolSpec } from '../src/domain/ai/tools'
 import { DEFAULT_OPENROUTER_MODEL, OpenRouterProvider } from '../src/llm/openrouter'
 import type { Profile, Transaction } from '../src/domain/types'
 import { bearerToken, hashPassword, newToken, sessionExpiry, tokenHash, verifyPassword } from './auth'
+import { handleReleaseRequest, type ReleaseCache } from './releases'
 import type { AuthStore, LedgerStore } from './store'
 
 export type WorkerDeps = {
@@ -10,6 +11,8 @@ export type WorkerDeps = {
   ledger: LedgerStore
   openRouterKey?: string
   openRouterModel?: string
+  githubToken?: string
+  releaseCache?: ReleaseCache
   fetchImpl?: typeof fetch
   now?: () => string
 }
@@ -74,6 +77,9 @@ export async function handleRequest(request: Request, deps: WorkerDeps): Promise
   if (request.method === 'OPTIONS') return json({ ok: true }, 204, origin)
   const url = new URL(request.url)
   const path = url.pathname
+  if (request.method === 'GET' && (path === '/app/latest' || path.startsWith('/app/download/'))) {
+    return handleReleaseRequest(request, deps)
+  }
 
   if (path === '/api/auth/sign-up' && request.method === 'POST') {
     const body = await readJson(request)
