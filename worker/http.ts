@@ -77,6 +77,7 @@ export async function handleRequest(request: Request, deps: WorkerDeps): Promise
   if (request.method === 'OPTIONS') return json({ ok: true }, 204, origin)
   const url = new URL(request.url)
   const path = url.pathname
+  if (request.method === 'GET' && (path === '/' || path === '/health')) return json({ ok: true }, 200, origin)
   if (request.method === 'GET' && (path === '/app/latest' || path.startsWith('/app/download/'))) {
     return handleReleaseRequest(request, deps)
   }

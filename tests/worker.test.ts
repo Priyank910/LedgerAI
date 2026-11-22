@@ -134,6 +134,12 @@ describe('worker auth and sync', () => {
     expect(JSON.stringify(body)).not.toContain('secret-key')
   })
 
+  it('answers a health check without a session', async () => {
+    const response = await handleRequest(new Request('https://ledger.test/health'), deps())
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ ok: true })
+  })
+
   it('indexes transactions by user and updated time', () => {
     const sql = readFileSync('migrations/0001_init.sql', 'utf8')
     expect(sql).toContain('CREATE INDEX transactions_user_updated_idx')
