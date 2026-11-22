@@ -1,6 +1,6 @@
 import { D1Auth, D1Ledger, type D1Like } from './d1'
 import { handleRequest } from './http'
-import { MemoryReleaseCache } from './releases'
+import { MemoryReleaseCache, type ReleaseCache } from './releases'
 
 export interface Env {
   DB: D1Like
@@ -9,14 +9,45 @@ export interface Env {
   GITHUB_RELEASES_TOKEN?: string
 }
 
-const releaseCache = new MemoryReleaseCache(() => Date.now())
+const memoryReleaseCache = new MemoryReleaseCache(() => Date.now())
+
+function releaseCacheKey(name: string): Request {
+  return new Request(`https://ledger-ai.priyank-chavda.workers.dev/__release_cache/${name}`)
+}
+
+function releaseCache(): ReleaseCache {
+  const cache = (globalThis as { caches?: { default?: Cache } }).caches?.default
+  if (!cache) return memoryReleaseCache
+  return {
+    async get(name: string) {
+      try {
+        const shared = await cache.match(releaseCacheKey(name))
+        if (shared) return shared.text()
+      } catch {
+        // A cache miss falls through to this isolate's memory.
+      }
+      return memoryReleaseCache.get(name)
+    },
+    async set(name: string, value: string, ttlMs: number) {
+      await memoryReleaseCache.set(name, value, ttlMs)
+      try {
+        await cache.put(
+          releaseCacheKey(name),
+          new Response(value, { headers: { 'cache-control': `public, max-age=${Math.floor(ttlMs / 1000)}` } }),
+        )
+      } catch {
+        // The memory entry still serves this isolate.
+      }
+    },
+  }
+}
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     return handleRequest(request, {
       auth: new D1Auth(env.DB),
       ledger: new D1Ledger(env.DB),
-      releaseCache,
+      releaseCache: releaseCache(),
       ...(env.OPENROUTER_API_KEY ? { openRouterKey: env.OPENROUTER_API_KEY } : {}),
       ...(env.OPENROUTER_MODEL ? { openRouterModel: env.OPENROUTER_MODEL } : {}),
       ...(env.GITHUB_RELEASES_TOKEN ? { githubToken: env.GITHUB_RELEASES_TOKEN } : {}),

@@ -119,7 +119,11 @@ export async function loadReleases(input: {
   const response = await input.fetchImpl(`https://api.github.com/repos/${RELEASE_REPO}/releases?per_page=30`, {
     headers: githubHeaders(input.token, 'application/vnd.github+json'),
   })
-  if (!response.ok) return null
+  if (!response.ok) {
+    const detail = (await response.text()).toLowerCase()
+    const rate = detail.includes('rate limit') ? ' rate-limit' : ''
+    throw new Error(`github-${response.status}${rate}`)
+  }
   const body = await readJson(response)
   if (!Array.isArray(body)) return null
   const releases = body.filter((item): item is GhRelease => {
