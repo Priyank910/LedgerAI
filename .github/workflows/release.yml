@@ -103,12 +103,40 @@ jobs:
             echo "Set TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD so the Windows update can be signed."
             exit 1
           fi
+          python - << 'PY'
+          import base64, os
+          raw = os.environ["TAURI_SIGNING_PRIVATE_KEY"]
+          raw = raw.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\r\n", "\n").replace("\r", "\n")
+          decoded = False
+          if not raw.strip().startswith("untrusted"):
+              try:
+                  text = base64.b64decode(raw.strip(), validate=False).decode("utf-8")
+              except Exception:
+                  text = ""
+              if "untrusted" in text:
+                  raw = text.replace("\r\n", "\n").replace("\r", "\n")
+                  decoded = True
+          if raw.count("\n") <= 1 and raw.strip().startswith("untrusted"):
+              parts = raw.strip().split(" ")
+              for index, part in enumerate(parts):
+                  if len(part) > 40:
+                      raw = " ".join(parts[:index]) + "\n" + "".join(parts[index:]) + "\n"
+                      break
+          if not raw.endswith("\n"):
+              raw += "\n"
+          path = os.path.join(os.environ["RUNNER_TEMP"], "updater.key")
+          with open(path, "w", newline="\n") as handle:
+              handle.write(raw)
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as handle:
+              handle.write(f"TAURI_KEY_FILE={path}\n")
+          print(f"updater key lines={raw.count(chr(10))} decoded_base64={decoded} starts_untrusted={raw.startswith('untrusted')}")
+          PY
       - name: Build the NSIS and MSI installers
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_API_URL: ${{ env.VITE_API_URL }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ env.TAURI_KEY_FILE }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ env.RELEASE_TAG }}
