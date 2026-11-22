@@ -210,7 +210,13 @@ export async function handleReleaseRequest(request: Request, deps: {
   const fetchImpl = deps.fetchImpl ?? fetch
   const now = Date.parse(deps.now?.() ?? '') || Date.now()
   const cache = deps.releaseCache ?? new MemoryReleaseCache(() => now)
-  const releases = await loadReleases({ ...(deps.githubToken ? { token: deps.githubToken } : {}), fetchImpl, cache })
+  let releases: GhRelease[] | null
+  try {
+    releases = await loadReleases({ ...(deps.githubToken ? { token: deps.githubToken } : {}), fetchImpl, cache })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'release-lookup-failed'
+    return jsonRelease({ error: message.slice(0, 180) }, 502, originHeader)
+  }
   const release = releases ? pickRelease(releases) : null
   if (url.pathname === '/app/latest') {
     const platform = url.searchParams.get('platform')

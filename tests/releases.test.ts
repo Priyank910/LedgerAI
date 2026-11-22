@@ -110,6 +110,19 @@ describe('release proxy', () => {
     expect(authorization).toBe('')
   })
 
+  it('returns a lookup error instead of throwing when GitHub cannot be reached', async () => {
+    const response = await handleRequest(new Request('https://ledger.test/app/latest?platform=windows'), {
+      auth: new MemoryAuth(),
+      ledger: new MemoryLedger(),
+      fetchImpl: async () => {
+        throw new Error('github-unreachable')
+      },
+      releaseCache: new MemoryReleaseCache(() => Date.now()),
+    })
+    expect(response.status).toBe(502)
+    expect(await response.json()).toEqual({ error: 'github-unreachable' })
+  })
+
   it('signs Android releases as PKCS12', () => {
     const gradle = readFileSync('android/app/build.gradle', 'utf8')
     expect(gradle).toContain("storeType 'PKCS12'")
