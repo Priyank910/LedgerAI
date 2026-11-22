@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - "v*"
+  # GitHub lists Run workflow only after this file is on the default branch.
+  # Until then, publishing a v* tag on this branch starts the release.
   workflow_dispatch:
     inputs:
       tag:
@@ -15,7 +17,7 @@ permissions:
   contents: write
 
 env:
-  VITE_API_URL: ${{ vars.VITE_API_URL || secrets.VITE_API_URL }}
+  VITE_API_URL: "${{ vars.VITE_API_URL || secrets.VITE_API_URL || 'https://ledger-ai.promptlab-ai.workers.dev' }}"
   RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || (github.event.inputs.tag || format('v0.0.0-ci.{0}', github.run_number)) }}
 
 jobs:
@@ -32,12 +34,8 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: android-actions/setup-android@v3
-      - name: Require the Worker URL
-        run: |
-          if [ -z "$VITE_API_URL" ]; then
-            echo "Set the VITE_API_URL repository variable to the deployed Worker URL (https://ledger-ai.<account>.workers.dev)."
-            exit 1
-          fi
+      - name: Worker URL baked into the app
+        run: echo "VITE_API_URL=$VITE_API_URL"
       - name: Install Android SDK 36
         run: |
           yes | sdkmanager --licenses >/dev/null || true
@@ -99,13 +97,9 @@ jobs:
           node-version: 22
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
-      - name: Require the Worker URL
+      - name: Worker URL baked into the app
         shell: bash
-        run: |
-          if [ -z "$VITE_API_URL" ]; then
-            echo "Set the VITE_API_URL repository variable to the deployed Worker URL (https://ledger-ai.<account>.workers.dev)."
-            exit 1
-          fi
+        run: echo "VITE_API_URL=$VITE_API_URL"
       - run: npm ci
       - name: Build the NSIS and MSI installers
         uses: tauri-apps/tauri-action@v0

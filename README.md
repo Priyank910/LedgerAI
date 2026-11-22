@@ -64,7 +64,7 @@ Copy `.env.example`. Do not commit `.env`.
 
 | Name | Where it is read | Purpose |
 | --- | --- | --- |
-| `VITE_API_URL` | app | Absolute Worker URL, for example `https://ledger-ai.<account>.workers.dev`. Required on Android and Windows. Leave empty for `npm run dev`, which proxies `/api` to wrangler on port 8787. |
+| `VITE_API_URL` | app | Worker origin. The default in `.env.example` and in release builds is `https://ledger-ai.promptlab-ai.workers.dev`. A repository variable or secret of the same name overrides the release build. Clear it for `npm run dev`, which proxies `/api` to wrangler on port 8787. |
 | `VITE_LLM_MODE` | app | Set to `mock` for the on-device phrase tool-caller. Leave empty in production. |
 | `OPENROUTER_API_KEY` | Worker secret only | OpenRouter key. Put it in `.dev.vars` for local wrangler and `wrangler secret put` for production. No `VITE_` prefix, so it is never bundled into the Android or Windows app. |
 | `OPENROUTER_MODEL` | Worker var | Defaults to `google/gemini-2.5-flash` in `wrangler.toml`. That model accepts tool calls and replies in Hindi and Gujarati. Change the var and redeploy to use another OpenRouter model. |
@@ -75,7 +75,7 @@ The free plan is enough for one shop. D1 holds the users, sessions, shop profile
 
 1. Create a free account at https://dash.cloudflare.com/sign-up.
 2. From this repo, sign the Wrangler CLI into that account: `npx wrangler login`.
-3. Create the database: `npx wrangler d1 create ledger-ai`. Copy the printed `database_id` into `wrangler.toml` in place of `00000000-0000-0000-0000-000000000000`. For GitHub Actions you can leave the placeholder and set the `CLOUDFLARE_D1_DATABASE_ID` repository variable instead. The deploy workflow substitutes it.
+3. The D1 database `ledger-ai` is `0e12107e-4cd7-4c2d-992c-289cd993fc79` in `wrangler.toml`. Set the `CLOUDFLARE_D1_DATABASE_ID` repository variable only if a deploy should use a different database. The workflow substitutes it when it is set, and otherwise uses the id in the file.
 4. Apply the schema locally and remotely:
 
 ```bash
@@ -85,7 +85,7 @@ npx wrangler d1 migrations apply ledger-ai --remote
 
 5. Copy `.dev.vars.example` to `.dev.vars` and set `OPENROUTER_API_KEY` for local runs. For the deployed Worker: `npx wrangler secret put OPENROUTER_API_KEY`.
 6. Deploy: `npm run worker:deploy` (this runs `wrangler deploy`). Wrangler prints the URL, shaped like `https://ledger-ai.<account>.workers.dev`. The same deploy also runs from GitHub Actions once the secrets below are set.
-7. Put that exact URL in the app’s `.env` as `VITE_API_URL`, with no trailing path. Release builds read the same URL from the `VITE_API_URL` repository variable. The OpenRouter key is not baked in.
+7. The Worker URL is `https://ledger-ai.promptlab-ai.workers.dev`. That value is the default for `VITE_API_URL` in `.env.example` and in the release workflow. Set the repository variable only to point a release at a different Worker. The OpenRouter key is not baked in.
 
 Local development is two processes. `npm run worker:dev` starts the Worker on http://127.0.0.1:8787 with Miniflare and the local D1 file. `npm run dev` proxies `/api` to that port. Leave `VITE_API_URL` empty while you do this.
 
@@ -156,23 +156,23 @@ Nothing else is billed if you stay on the free tiers above.
 
 1. A Cloudflare account.
 2. `npx wrangler login` on the machine that deploys.
-3. `npx wrangler d1 create ledger-ai`, then the printed database id pasted into `wrangler.toml`.
-4. `npx wrangler d1 migrations apply ledger-ai --remote` (and `--local` on the machine you develop on).
+3. The database id `0e12107e-4cd7-4c2d-992c-289cd993fc79` is already in `wrangler.toml`. Remote migrations are applied by the deploy workflow, not by hand. Use `--local` only on a machine where you run wrangler.
+4. Nothing else for the database id. `CLOUDFLARE_D1_DATABASE_ID` is optional and overrides the committed id when set.
 5. An OpenRouter API key from https://openrouter.ai/keys, stored with `npx wrangler secret put OPENROUTER_API_KEY`. For local wrangler, the same key in `.dev.vars`.
 6. `npm run worker:deploy`, or the Deploy Worker GitHub Action after the secrets in the next section are set.
-7. The printed `*.workers.dev` URL as the `VITE_API_URL` repository variable (and in `.env` for a local native build).
+7. Nothing else for the app URL. Release builds default to `https://ledger-ai.promptlab-ai.workers.dev`. Set `VITE_API_URL` only to override that.
 8. Optional: change `OPENROUTER_MODEL` in `wrangler.toml` if `google/gemini-2.5-flash` is not the model you want. Keep a model that supports tool calling.
 9. Optional: an Android release keystore, as the four `ANDROID_*` repository secrets, so each release APK updates the previous install. Without them, Actions generates a new test keystore for that run.
 10. Rust, Node 22, and WebView2 only if you still build the Windows installer on a PC. The release workflow builds it on `windows-latest`.
 
-After `VITE_API_URL` is set, a tag `v*` (or Actions → Release → Run workflow) builds the Android APK and the Windows installers. The OpenRouter key is not baked in.
+A `v*` tag builds the Android APK and the Windows installers. The OpenRouter key is not baked in. GitHub shows **Run workflow** only after these workflow files are on `main`. Until this pull request is merged, start Release and Deploy Worker by publishing a `v*` release from the website with this branch selected.
 
 ## Releases from GitHub Actions
 
 You do not need a local Android SDK or a Windows PC.
 
-- `.github/workflows/release.yml` runs on a tag `v*` and on **Run workflow**. It builds a signed release APK on Ubuntu and the NSIS `.exe` and `.msi` on `windows-latest` (`tauri-apps/tauri-action`). Both bake `VITE_API_URL` from the repository variable, or from a secret of the same name if the variable is empty. The workflow uploads them to a GitHub Release with `draft: false` and `prerelease: true`. A manual run with no tag uses `v0.0.0-ci.<run number>`.
+- `.github/workflows/release.yml` runs on a tag `v*` and on **Run workflow** once the file is on `main`. It builds a signed release APK on Ubuntu and the NSIS `.exe` and `.msi` on `windows-latest` (`tauri-apps/tauri-action`). Both bake `VITE_API_URL` from the repository variable, then a secret of the same name, then `https://ledger-ai.promptlab-ai.workers.dev`. The workflow uploads them to a GitHub Release with `draft: false` and `prerelease: true`. A manual run with no tag uses `v0.0.0-ci.<run number>`.
 - If `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD` are set, the APK is signed with that keystore. Otherwise the job generates a throwaway keystore, so the APK installs, but the next run will not update that install.
-- `.github/workflows/deploy-worker.yml` runs on **Run workflow**, and on a push to `main` that touches `worker/`, `migrations/`, or `wrangler.toml`. It fills the placeholder `database_id` from `CLOUDFLARE_D1_DATABASE_ID` when that value is still the zeros, applies D1 migrations with `--remote`, runs `wrangler deploy`, then sets the `OPENROUTER_API_KEY` Worker secret from stdin with `wrangler secret put`. The secret is live as soon as that command finishes.
+- `.github/workflows/deploy-worker.yml` runs on a tag `v*`, on **Run workflow** once the file is on `main`, and on a push to `main` that touches `worker/`, `migrations/`, or `wrangler.toml`. It uses `wrangler.toml`’s database id unless `CLOUDFLARE_D1_DATABASE_ID` is set. It applies D1 migrations with `--remote`, runs `wrangler deploy`, then sets the `OPENROUTER_API_KEY` Worker secret from stdin with `wrangler secret put`. The secret is live as soon as that command finishes.
 
 `npm test` and `npm run build` still run on every push and pull request (`.github/workflows/test.yml`).

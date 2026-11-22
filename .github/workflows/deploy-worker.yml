@@ -3,7 +3,12 @@ name: Deploy Worker
 on:
   workflow_dispatch:
   push:
+    # Path filters are not applied to tag pushes, so a v* tag on this branch
+    # deploys before the workflow is on main. GitHub only lists Run workflow
+    # for workflow files that exist on the default branch.
     branches: [main]
+    tags:
+      - "v*"
     paths:
       - "worker/**"
       - "migrations/**"
@@ -25,18 +30,15 @@ jobs:
           CLOUDFLARE_D1_DATABASE_ID: ${{ vars.CLOUDFLARE_D1_DATABASE_ID || secrets.CLOUDFLARE_D1_DATABASE_ID }}
         run: |
           set -euo pipefail
-          placeholder="00000000-0000-0000-0000-000000000000"
-          if grep -q "$placeholder" wrangler.toml; then
-            if [ -z "${CLOUDFLARE_D1_DATABASE_ID}" ]; then
-              echo "wrangler.toml still has the placeholder database_id."
-              echo "Set the CLOUDFLARE_D1_DATABASE_ID repository variable to the id from: npx wrangler d1 create ledger-ai"
-              exit 1
-            fi
+          if [ -n "${CLOUDFLARE_D1_DATABASE_ID}" ]; then
             if ! printf '%s' "$CLOUDFLARE_D1_DATABASE_ID" | grep -Eq '^[0-9a-fA-F-]{36}$'; then
-              echo "CLOUDFLARE_D1_DATABASE_ID should be the UUID printed by wrangler d1 create."
+              echo "CLOUDFLARE_D1_DATABASE_ID should be a UUID."
               exit 1
             fi
-            sed -i "s/${placeholder}/${CLOUDFLARE_D1_DATABASE_ID}/" wrangler.toml
+            sed -i -E "s/database_id = \"[0-9a-fA-F-]+\"/database_id = \"${CLOUDFLARE_D1_DATABASE_ID}\"/" wrangler.toml
+            echo "Replaced database_id from CLOUDFLARE_D1_DATABASE_ID."
+          else
+            echo "CLOUDFLARE_D1_DATABASE_ID is unset. Using the database_id in wrangler.toml."
           fi
       - name: Apply remote D1 migrations
         env:
