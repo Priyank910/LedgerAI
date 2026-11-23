@@ -60,7 +60,24 @@ export function BooksProvider({ children }: { children: ReactNode }) {
   stateRef.current = state
 
   useEffect(() => {
-    void loadState().then(setState)
+    void loadState().then((loaded) => {
+      if (import.meta.env.DEV && new URLSearchParams(location.search).get('preview') === 'shop' && loaded.profile === null) {
+        const now = new Date().toISOString()
+        const today = now.slice(0, 10)
+        setState({
+          ...loaded,
+          profile: { shopName: 'શ્રી ગણેશ ટેલર્સ', openingBalancePaise: 4_822_000, setupDate: today, updatedAt: now },
+          transactions: [
+            { id: 'd1', type: 'income', title: 'બ્લાઉઝ સિલાઈ, મીના પટેલ', amountPaise: 85_000, date: today, payment: 'cash', category: 'stitching', note: '', updatedAt: now, deletedAt: null },
+            { id: 'd2', type: 'expense', title: 'બજારમાંથી કાપડ', amountPaise: 240_000, date: today, payment: 'upi', category: 'cloth', note: '', updatedAt: now, deletedAt: null },
+            { id: 'd3', type: 'income', title: 'શેરવાની, રાજેશભાઈ', amountPaise: 1_500_000, date: today, payment: 'upi', category: 'stitching', note: '', updatedAt: now, deletedAt: null },
+            { id: 'd4', type: 'expense', title: 'વીજળી બિલ', amountPaise: 180_000, date: today, payment: 'bank', category: 'electricity', note: '', updatedAt: now, deletedAt: null },
+          ],
+        })
+        return
+      }
+      setState(loaded)
+    })
   }, [])
 
   useEffect(() => {
