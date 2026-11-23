@@ -22,5 +22,5 @@ body { margin: 0; }
   box-shadow: 4px 8px 18px rgb(20 20 20 / 10%);
 }
 .opt a strong { display: block; font-size: 1.25rem; }
-.opt a:nth-child(2) { background: #f6b400; }
+.opt a:first-child { background: #f6b400; }
 .opt a:focus-visible { outline: 3px solid #141414; outline-offset: 3px; }
