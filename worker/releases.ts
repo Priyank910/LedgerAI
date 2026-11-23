@@ -2,6 +2,8 @@ import { compareReleaseVersions, parseReleaseTag, type ReleaseVersion } from '..
 
 export const RELEASE_REPO = 'Priyank910/LedgerAI'
 export const RELEASE_CACHE_MS = 10 * 60 * 1000
+export const LATEST_MANIFEST_URL = `https://github.com/${RELEASE_REPO}/releases/latest/download/latest.json`
+const MANIFEST_CACHE_KEY = 'latest-manifest'
 
 export type ReleaseAsset = { name: string; url: string; browser_download_url: string }
 
@@ -17,6 +19,7 @@ export type GhRelease = {
 
 export type ReleaseCache = {
   get(key: string): Promise<string | null>
+  getStale(key: string): Promise<string | null>
   set(key: string, value: string, ttlMs: number): Promise<void>
 }
 
@@ -29,6 +32,10 @@ export class MemoryReleaseCache implements ReleaseCache {
     const hit = this.entries.get(key)
     if (!hit || hit.expires <= this.now()) return null
     return hit.value
+  }
+
+  async getStale(key: string) {
+    return this.entries.get(key)?.value ?? null
   }
 
   async set(key: string, value: string, ttlMs: number) {
@@ -79,6 +86,48 @@ export function rewriteUpdaterManifest(payload: unknown, origin: string): Record
   }
   if (Object.keys(nextPlatforms).length === 0) return null
   return { ...root, platforms: nextPlatforms }
+}
+
+export type ServedManifest = {
+  windows: Record<string, unknown>
+  android: {
+    version: string
+    versionCode: number
+    notes: string
+    url: string
+    releaseUrl: string
+    pubDate: string | null
+  }
+}
+
+export function projectLatestManifest(payload: unknown, origin: string): ServedManifest | null {
+  if (typeof payload !== 'object' || payload === null) return null
+  const root = payload as Record<string, unknown>
+  if (typeof root.version !== 'string') return null
+  const parsed = parseReleaseTag(root.version)
+  if (!parsed) return null
+  const rewritten = rewriteUpdaterManifest(root, origin)
+  if (!rewritten) return null
+  const androidBlock = root.android
+  if (typeof androidBlock !== 'object' || androidBlock === null) return null
+  const android = androidBlock as { url?: unknown; versionCode?: unknown; releaseUrl?: unknown }
+  if (typeof android.url !== 'string') return null
+  const apkName = assetFileName(android.url) ?? (android.url.toLowerCase().endsWith('.apk') ? decodeURIComponent(android.url.slice(android.url.lastIndexOf('/') + 1)) : null)
+  if (!apkName) return null
+  const versionCode = typeof android.versionCode === 'number' ? android.versionCode : parsed.versionCode
+  const { android: _android, ...windows } = rewritten
+  void _android
+  return {
+    windows,
+    android: {
+      version: parsed.version,
+      versionCode,
+      notes: typeof root.notes === 'string' ? root.notes : '',
+      url: downloadUrl(origin, apkName),
+      releaseUrl: typeof android.releaseUrl === 'string' ? android.releaseUrl : `https://github.com/${RELEASE_REPO}/releases/tag/v${parsed.version}`,
+      pubDate: typeof root.pub_date === 'string' ? root.pub_date : null,
+    },
+  }
 }
 
 export function androidRelease(release: GhRelease, origin: string) {
@@ -215,13 +264,6 @@ export async function streamReleaseAsset(input: {
   })
 }
 
-function noRelease(): Response {
-  return new Response(null, {
-    status: 204,
-    headers: { 'access-control-allow-origin': '*', 'cache-control': 'no-store' },
-  })
-}
-
 function jsonRelease(body: unknown, status: number, origin: string | null): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -237,6 +279,40 @@ function workerFetch(fetchImpl?: typeof fetch): typeof fetch {
   return (input, init) => fetch(input, init)
 }
 
+function publicDownloadHeaders(token?: string): Headers {
+  const headers = new Headers({ accept: 'application/octet-stream', 'user-agent': 'ledger-ai' })
+  if (token) headers.set('authorization', `Bearer ${token}`)
+  return headers
+}
+
+export function githubDownloadUrl(fileName: string): string {
+  return `https://github.com/${RELEASE_REPO}/releases/latest/download/${encodeURIComponent(fileName)}`
+}
+
+async function fetchGithubDownload(fetchImpl: typeof fetch, url: string, token?: string): Promise<Response> {
+  const first = await fetchImpl(url, { headers: publicDownloadHeaders(token), redirect: 'manual' })
+  if (first.status >= 300 && first.status < 400) {
+    const location = first.headers.get('location')
+    if (!location) return first
+    return fetchImpl(new URL(location, url).toString(), { redirect: 'follow' })
+  }
+  return first
+}
+
+function servePlatform(raw: string, platform: string | null, origin: string, originHeader: string | null): Response | null {
+  let payload: unknown
+  try {
+    payload = JSON.parse(raw) as unknown
+  } catch {
+    return null
+  }
+  const projected = projectLatestManifest(payload, origin)
+  if (!projected) return null
+  if (platform === 'android') return jsonRelease(projected.android, 200, originHeader)
+  if (platform === 'windows') return jsonRelease(projected.windows, 200, originHeader)
+  return null
+}
+
 export async function handleReleaseRequest(request: Request, deps: {
   githubToken?: string
   fetchImpl?: typeof fetch
@@ -248,33 +324,54 @@ export async function handleReleaseRequest(request: Request, deps: {
   const fetchImpl = workerFetch(deps.fetchImpl)
   const now = Date.parse(deps.now?.() ?? '') || Date.now()
   const cache = deps.releaseCache ?? new MemoryReleaseCache(() => now)
-  let releases: GhRelease[] | null
-  try {
-    releases = await loadReleases({ ...(deps.githubToken ? { token: deps.githubToken } : {}), fetchImpl, cache })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'release-lookup-failed'
-    return jsonRelease({ error: message.slice(0, 180) }, 502, originHeader)
-  }
-  const release = releases ? pickRelease(releases) : null
+  const token = deps.githubToken
   if (url.pathname === '/app/latest') {
     const platform = url.searchParams.get('platform')
-    if (!release) return noRelease()
-    if (platform === 'android') {
-      const body = androidRelease(release, url.origin)
-      if (!body) return noRelease()
-      return jsonRelease(body, 200, originHeader)
+    if (platform !== 'android' && platform !== 'windows') return jsonRelease({ error: 'bad-platform' }, 400, originHeader)
+    const fresh = await cache.get(MANIFEST_CACHE_KEY)
+    if (fresh) {
+      const served = servePlatform(fresh, platform, url.origin, originHeader)
+      if (served) return served
     }
-    if (platform === 'windows') {
-      const manifest = await windowsManifest({ release, origin: url.origin, fetchImpl, ...(deps.githubToken ? { token: deps.githubToken } : {}) })
-      if (!manifest) return noRelease()
-      return jsonRelease(manifest, 200, originHeader)
+    try {
+      const response = await fetchGithubDownload(fetchImpl, LATEST_MANIFEST_URL, token)
+      if (!response.ok) throw new Error(`release-${response.status}`)
+      const raw = await response.text()
+      if (!projectLatestManifest(JSON.parse(raw) as unknown, url.origin)) throw new Error('bad-manifest')
+      await cache.set(MANIFEST_CACHE_KEY, raw, RELEASE_CACHE_MS)
+      const served = servePlatform(raw, platform, url.origin, originHeader)
+      if (served) return served
+      throw new Error('bad-manifest')
+    } catch (error) {
+      const stale = await cache.getStale(MANIFEST_CACHE_KEY)
+      if (stale) {
+        const served = servePlatform(stale, platform, url.origin, originHeader)
+        if (served) return served
+      }
+      const message = error instanceof Error ? error.message : 'release-lookup-failed'
+      return jsonRelease({ error: message.slice(0, 180) }, 502, originHeader)
     }
-    return jsonRelease({ error: 'bad-platform' }, 400, originHeader)
   }
   if (url.pathname.startsWith('/app/download/')) {
-    if (!release) return jsonRelease({ error: 'not-found' }, 404, originHeader)
     const fileName = decodeURIComponent(url.pathname.slice('/app/download/'.length))
-    return streamReleaseAsset({ release, fileName, fetchImpl, originHeader, ...(deps.githubToken ? { token: deps.githubToken } : {}) })
+    if (!fileName || fileName.includes('/') || fileName.includes('\\')) return jsonRelease({ error: 'not-found' }, 404, originHeader)
+    try {
+      const upstream = await fetchGithubDownload(fetchImpl, githubDownloadUrl(fileName), token)
+      if (!upstream.ok || !upstream.body) return jsonRelease({ error: 'download-failed' }, 502, originHeader)
+      const type = fileName.toLowerCase().endsWith('.apk') ? 'application/vnd.android.package-archive' : 'application/octet-stream'
+      return new Response(upstream.body, {
+        status: 200,
+        headers: {
+          'content-type': type,
+          'content-disposition': `attachment; filename="${fileName.replaceAll('"', '')}"`,
+          'access-control-allow-origin': originHeader && originHeader !== 'null' ? originHeader : '*',
+          'cache-control': 'private, max-age=600',
+        },
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'download-failed'
+      return jsonRelease({ error: message.slice(0, 180) }, 502, originHeader)
+    }
   }
   return jsonRelease({ error: 'not-found' }, 404, originHeader)
 }

@@ -27,14 +27,19 @@ const release = (tag: string, extra: Partial<GhRelease> = {}): GhRelease => ({
 })
 
 const manifest = {
-  version: '0.1.1',
-  notes: 'Gujarati fix',
-  pub_date: '2026-11-22T00:00:00Z',
+  version: '0.1.2',
+  notes: 'Update check',
+  pub_date: '2026-11-23T00:00:00Z',
   platforms: {
     'windows-x86_64': {
       signature: 'sig-bytes',
-      url: 'https://github.com/Priyank910/LedgerAI/releases/download/v0.1.1/Ledger%20AI_0.1.1_x64-setup.exe',
+      url: 'https://github.com/Priyank910/LedgerAI/releases/download/v0.1.2/Ledger%20AI_0.1.2_x64-setup.exe',
     },
+  },
+  android: {
+    versionCode: 102,
+    url: 'https://github.com/Priyank910/LedgerAI/releases/download/v0.1.2/app-release.apk',
+    releaseUrl: 'https://github.com/Priyank910/LedgerAI/releases/tag/v0.1.2',
   },
 }
 
@@ -48,39 +53,60 @@ describe('release proxy', () => {
     expect(chosen?.tag_name).toBe('v0.1.1')
   })
 
-  it('serves the Tauri manifest and the Android APK through the Worker without a session', async () => {
+  it('serves Windows and Android from the public latest.json file', async () => {
     const seen: { url: string; authorization: string }[] = []
     const fetchImpl: typeof fetch = async (url, init) => {
       const href = String(url)
       seen.push({ url: href, authorization: new Headers(init?.headers).get('authorization') ?? '' })
-      if (href.includes('/releases?')) return new Response(JSON.stringify([release('v0.1.0'), release('v0.1.1')]))
-      if (href.endsWith('v0.1.1-json')) return new Response(JSON.stringify(manifest))
+      if (href.endsWith('/releases/latest/download/latest.json')) return new Response(JSON.stringify(manifest))
       return new Response('missing', { status: 404 })
     }
     const store = deps(fetchImpl)
     const windows = await handleRequest(new Request('https://ledger.test/app/latest?platform=windows'), store)
     const windowsBody = (await windows.json()) as { version: string; platforms: { 'windows-x86_64': { url: string; signature: string } } }
     expect(windows.status).toBe(200)
-    expect(windowsBody.version).toBe('0.1.1')
+    expect(windowsBody.version).toBe('0.1.2')
     expect(windowsBody.platforms['windows-x86_64'].signature).toBe('sig-bytes')
-    expect(windowsBody.platforms['windows-x86_64'].url).toBe('https://ledger.test/app/download/Ledger%20AI_0.1.1_x64-setup.exe')
+    expect(windowsBody.platforms['windows-x86_64'].url).toBe('https://ledger.test/app/download/Ledger%20AI_0.1.2_x64-setup.exe')
     expect(JSON.stringify(windowsBody)).not.toContain('gh-secret')
+    expect(JSON.stringify(windowsBody)).not.toContain('api.github.com')
 
     const android = await handleRequest(new Request('https://ledger.test/app/latest?platform=android'), store)
     const androidBody = (await android.json()) as { version: string; versionCode: number; url: string }
-    expect(androidBody).toMatchObject({ version: '0.1.1', versionCode: 101, url: 'https://ledger.test/app/download/app-release.apk' })
-    expect(seen.filter((call) => call.url.includes('/releases?'))).toHaveLength(1)
+    expect(androidBody).toMatchObject({ version: '0.1.2', versionCode: 102, url: 'https://ledger.test/app/download/app-release.apk' })
+    expect(seen.filter((call) => call.url.includes('api.github.com'))).toHaveLength(0)
+    expect(seen).toHaveLength(1)
     expect(seen[0]?.authorization).toBe('Bearer gh-secret')
   })
 
-  it('streams an asset and does not send the token to the redirected host', async () => {
+  it('serves the last good manifest when the release file later fails', async () => {
+    let fail = false
+    const now = { t: Date.parse('2026-11-23T00:00:00Z') }
+    const cache = new MemoryReleaseCache(() => now.t)
+    const fetchImpl: typeof fetch = async () => {
+      if (fail) throw new Error('github-403 rate-limit')
+      return new Response(JSON.stringify(manifest))
+    }
+    const store = deps(fetchImpl, cache)
+    const first = await handleRequest(new Request('https://ledger.test/app/latest?platform=android'), store)
+    expect(first.status).toBe(200)
+    now.t += 11 * 60 * 1000
+    fail = true
+    const windows = await handleRequest(new Request('https://ledger.test/app/latest?platform=windows&current=0.1.2'), store)
+    const android = await handleRequest(new Request('https://ledger.test/app/latest?platform=android'), store)
+    expect(windows.status).toBe(200)
+    expect(android.status).toBe(200)
+    expect(((await windows.json()) as { version: string }).version).toBe('0.1.2')
+    expect(((await android.json()) as { version: string }).version).toBe('0.1.2')
+  })
+
+  it('streams an asset from the public download URL and does not send the token to the redirected host', async () => {
     const hosts: string[] = []
     const fetchImpl: typeof fetch = async (url, init) => {
       const href = String(url)
       hosts.push(new URL(href).host)
       const authorization = new Headers(init?.headers).get('authorization')
-      if (href.includes('/releases?')) return new Response(JSON.stringify([release('v0.1.1')]))
-      if (href.endsWith('v0.1.1-apk')) {
+      if (href.includes('/releases/latest/download/app-release.apk')) {
         expect(authorization).toBe('Bearer gh-secret')
         return new Response(null, { status: 302, headers: { location: 'https://objects.githubusercontent.com/apk' } })
       }
@@ -92,13 +118,16 @@ describe('release proxy', () => {
     expect(await response.text()).toBe('apk-bytes')
     expect(response.headers.get('content-type')).toContain('android.package-archive')
     expect(hosts).toContain('objects.githubusercontent.com')
+    expect(hosts.some((host) => host === 'api.github.com')).toBe(false)
   })
 
-  it('calls the public API when no token is configured', async () => {
+  it('reads the public release file when no token is configured', async () => {
     let authorization = 'unset'
-    const fetchImpl: typeof fetch = async (_url, init) => {
+    let href = ''
+    const fetchImpl: typeof fetch = async (url, init) => {
+      href = String(url)
       authorization = new Headers(init?.headers).get('authorization') ?? ''
-      return new Response('[]')
+      return new Response(JSON.stringify(manifest))
     }
     const response = await handleRequest(new Request('https://ledger.test/app/latest?platform=android'), {
       auth: new MemoryAuth(),
@@ -106,11 +135,12 @@ describe('release proxy', () => {
       fetchImpl,
       releaseCache: new MemoryReleaseCache(() => Date.now()),
     })
-    expect(response.status).toBe(204)
+    expect(response.status).toBe(200)
     expect(authorization).toBe('')
+    expect(href).toBe('https://github.com/Priyank910/LedgerAI/releases/latest/download/latest.json')
   })
 
-  it('returns a lookup error instead of throwing when GitHub cannot be reached', async () => {
+  it('returns a lookup error instead of throwing when nothing has been cached', async () => {
     const response = await handleRequest(new Request('https://ledger.test/app/latest?platform=windows'), {
       auth: new MemoryAuth(),
       ledger: new MemoryLedger(),
@@ -123,19 +153,20 @@ describe('release proxy', () => {
     expect(await response.json()).toEqual({ error: 'github-unreachable' })
   })
 
-  it('does not cache an empty release list', async () => {
+  it('does not cache a failed lookup', async () => {
     let calls = 0
     const cache = new MemoryReleaseCache(() => Date.parse('2026-11-22T00:00:00Z'))
     const fetchImpl: typeof fetch = async () => {
       calls += 1
-      return new Response(calls === 1 ? '[]' : JSON.stringify([release('v0.1.0')]))
+      if (calls === 1) return new Response('missing', { status: 404 })
+      return new Response(JSON.stringify(manifest))
     }
     const store = deps(fetchImpl, cache)
     const first = await handleRequest(new Request('https://ledger.test/app/latest?platform=android'), store)
-    expect(first.status).toBe(204)
+    expect(first.status).toBe(502)
     const second = await handleRequest(new Request('https://ledger.test/app/latest?platform=android'), store)
     const body = (await second.json()) as { version: string }
-    expect(body.version).toBe('0.1.0')
+    expect(body.version).toBe('0.1.2')
     expect(calls).toBe(2)
   })
 

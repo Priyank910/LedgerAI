@@ -28,6 +28,15 @@ function releaseCache(): ReleaseCache {
       }
       return memoryReleaseCache.get(name)
     },
+    async getStale(name: string) {
+      try {
+        const shared = await cache.match(releaseCacheKey(`${name}:last-good`))
+        if (shared) return shared.text()
+      } catch {
+        // The memory copy is the fallback.
+      }
+      return memoryReleaseCache.getStale(name)
+    },
     async set(name: string, value: string, ttlMs: number) {
       await memoryReleaseCache.set(name, value, ttlMs)
       try {
@@ -35,8 +44,12 @@ function releaseCache(): ReleaseCache {
           releaseCacheKey(name),
           new Response(value, { headers: { 'cache-control': `public, max-age=${Math.floor(ttlMs / 1000)}` } }),
         )
+        await cache.put(
+          releaseCacheKey(`${name}:last-good`),
+          new Response(value, { headers: { 'cache-control': 'public, max-age=2592000' } }),
+        )
       } catch {
-        // The memory entry still serves this isolate.
+        // The memory entry still serves this isolate, including after it expires.
       }
     },
   }

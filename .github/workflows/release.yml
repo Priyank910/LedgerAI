@@ -131,7 +131,7 @@ jobs:
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: Ledger AI ${{ env.RELEASE_TAG }}
           releaseDraft: false
-          prerelease: true
+          prerelease: false
           includeUpdaterJson: true
           updaterJsonPreferNsis: true
           args: --bundles nsis,msi
@@ -140,6 +140,7 @@ jobs:
     needs: [android, windows]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: android-apk
@@ -150,8 +151,15 @@ jobs:
           tag_name: ${{ env.RELEASE_TAG }}
           name: Ledger AI ${{ env.RELEASE_TAG }}
           draft: false
-          prerelease: true
+          prerelease: false
           files: apk/*.apk
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Add the Android app to latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "$RELEASE_TAG" --pattern latest.json --dir "$RUNNER_TEMP/rel"
+          node scripts/add-android-to-latest.mjs "$RUNNER_TEMP/rel/latest.json" "$RELEASE_TAG"
+          gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/rel/latest.json" --clobber
