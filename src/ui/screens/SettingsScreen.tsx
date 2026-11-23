@@ -5,6 +5,7 @@ import { parseOpeningToPaise } from '../../domain/money'
 import { translate, type MessageKey } from '../../i18n'
 import { saveOrShare } from '../../export/share'
 import { useBooks, type SyncStatus } from '../books'
+import { useUpdateCheck } from '../UpdatePrompt'
 import { LanguageSwitch, ThemeSwitch } from './WelcomeScreen'
 
 function syncText(status: SyncStatus, t: (key: MessageKey, vars?: Record<string, string | number>) => string): string {
@@ -30,6 +31,7 @@ function syncText(status: SyncStatus, t: (key: MessageKey, vars?: Record<string,
 
 export function SettingsScreen() {
   const books = useBooks()
+  const updates = useUpdateCheck()
   const { state, dispatch, notify, email, syncStatus, signIn, signUp, signOut } = books
   const profile = state.profile
   const t = (key: MessageKey, vars?: Record<string, string | number>) => translate(state.locale, key, vars)
@@ -74,6 +76,18 @@ export function SettingsScreen() {
       <h1>{t('settings')}</h1>
       <LanguageSwitch />
       <ThemeSwitch />
+      <section className="block">
+        <h2>{t('checkUpdates')}</h2>
+        <p className="status" role="status">
+          {updates.currentVersion ? t('updateCurrent', { version: updates.currentVersion }) : t('updateChecking')}
+          {updates.phase === 'current' ? ` ${t('updateUpToDate')}` : ''}
+          {updates.phase === 'available' ? ` ${t('updateAvailable')}` : ''}
+          {updates.phase === 'error' ? ` ${t('updateCheckFailed', { reason: updates.reason })}` : ''}
+        </p>
+        <button type="button" className="ghost-ink" onClick={() => void updates.checkNow()} disabled={updates.phase === 'checking'}>
+          {updates.phase === 'checking' ? t('updateChecking') : t('checkUpdates')}
+        </button>
+      </section>
       <form
         className="block"
         onSubmit={(event) => {

@@ -42,7 +42,10 @@ jobs:
       - name: Build the web bundle
         run: npm run build
       - name: Sync Capacitor
-        run: npx cap sync android
+        run: |
+          npx cap sync android
+          grep -q capacitor-app android/capacitor.settings.gradle
+          grep -q '@capacitor/app' android/app/src/main/assets/capacitor.plugins.json
       - name: Prepare the release keystore
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}

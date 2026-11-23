@@ -10,7 +10,7 @@ import { InsightsScreen } from './screens/InsightsScreen'
 import { LedgerScreen } from './screens/LedgerScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { WelcomeScreen } from './screens/WelcomeScreen'
-import { UpdatePrompt } from './UpdatePrompt'
+import { UpdateGate } from './UpdatePrompt'
 
 type Page = 'home' | 'ledger' | 'insights' | 'ask' | 'settings'
 
@@ -124,8 +124,7 @@ function Frame() {
   const { state } = useBooks()
   return (
     <>
-      {state.profile ? <Shell /> : <WelcomeScreen />}
-      <UpdatePrompt />
+      <UpdateGate>{state.profile ? <Shell /> : <WelcomeScreen />}</UpdateGate>
     </>
   )
 }

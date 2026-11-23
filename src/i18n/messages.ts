@@ -148,6 +148,11 @@ export const en = {
   updateAndroidPermission: 'Android asks once for permission to install apps from Ledger AI. Allow it, then tap Update now again. The system installer opens next.',
   updateFailed: 'The update did not install. Your books are still on this device.',
   updateOpenRelease: 'Open the release page',
+  checkUpdates: 'Check for updates',
+  updateChecking: 'Checking for updates…',
+  updateCurrent: 'This copy is version {version}.',
+  updateUpToDate: "You're on the latest version.",
+  updateCheckFailed: 'Could not check for updates. {reason}',
   crash: 'Ledger AI hit a problem. Your books are still on this device. Close the app and open it again.',
 } as const
 
@@ -303,6 +308,11 @@ export const hi: Record<MessageKey, string> = {
   updateAndroidPermission: 'एंड्रॉइड एक बार पूछेगा कि Ledger AI से ऐप इंस्टॉल करने की अनुमति दें. अनुमति दें, फिर फिर से अभी अपडेट करें दबाएँ. इसके बाद सिस्टम का इंस्टॉलर खुलेगा.',
   updateFailed: 'अपडेट इंस्टॉल नहीं हुआ. आपका हिसाब इस डिवाइस पर सुरक्षित है.',
   updateOpenRelease: 'रिलीज़ पेज खोलें',
+  checkUpdates: 'अपडेट देखें',
+  updateChecking: 'अपडेट देखा जा रहा है…',
+  updateCurrent: 'यह कॉपी संस्करण {version} है.',
+  updateUpToDate: 'यह सबसे नया संस्करण है.',
+  updateCheckFailed: 'अपडेट नहीं देख सके. {reason}',
   crash: 'Ledger AI में दिक्कत आई. आपका हिसाब इस डिवाइस पर सुरक्षित है. ऐप बंद करके फिर खोलिए.',
 }
 
@@ -456,5 +466,10 @@ export const gu: Record<MessageKey, string> = {
   updateAndroidPermission: 'એન્ડ્રોઇડ એક વાર પૂછશે કે Ledger AI માંથી એપ ઇન્સ્ટોલ કરવાની છૂટ આપો. છૂટ આપો, પછી ફરી હમણાં અપડેટ કરો દબાવો. પછી સિસ્ટમનું ઇન્સ્ટોલર ખુલશે.',
   updateFailed: 'અપડેટ ઇન્સ્ટોલ થયું નહીં. તમારો હિસાબ આ ડિવાઇસ પર સુરક્ષિત છે.',
   updateOpenRelease: 'રિલીઝ પેજ ખોલો',
+  checkUpdates: 'અપડેટ ચકાસો',
+  updateChecking: 'અપડેટ ચકાસાઈ રહ્યું છે…',
+  updateCurrent: 'આ નકલ સંસ્કરણ {version} છે.',
+  updateUpToDate: 'આ સૌથી નવું સંસ્કરણ છે.',
+  updateCheckFailed: 'અપડેટ ચકાસી શકાયું નહીં. {reason}',
   crash: 'Ledger AI માં તકલીફ આવી. તમારો હિસાબ આ ડિવાઇસ પર સુરક્ષિત છે. એપ બંધ કરીને ફરી ખોલો.',
 }
