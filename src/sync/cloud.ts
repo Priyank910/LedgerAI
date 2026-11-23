@@ -35,8 +35,18 @@ async function api(path: string, init: RequestInit = {}): Promise<ApiResult> {
 }
 
 export async function signUp(email: string, password: string): Promise<{ token: string; email: string }> {
-  const result = await api('/api/auth/sign-up', { method: 'POST', body: JSON.stringify({ email, password }) })
-  if (!result.ok || typeof result.body.token !== 'string') throw new Error(result.status === 409 ? 'exists' : 'auth')
+  if (password.length < 6) throw new Error('short')
+  let result: ApiResult
+  try {
+    result = await api('/api/auth/sign-up', { method: 'POST', body: JSON.stringify({ email, password }) })
+  } catch {
+    throw new Error('unreachable')
+  }
+  if (!result.ok || typeof result.body.token !== 'string') {
+    if (result.status === 409 || result.body.error === 'exists') throw new Error('exists')
+    if (result.status === 400) throw new Error('short')
+    throw new Error('create')
+  }
   writeToken(result.body.token)
   return { token: result.body.token, email: String(result.body.email) }
 }

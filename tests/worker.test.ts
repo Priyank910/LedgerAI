@@ -134,6 +134,26 @@ describe('worker auth and sync', () => {
     expect(JSON.stringify(body)).not.toContain('secret-key')
   })
 
+  it('answers the sign-up preflight with CORS headers and an empty body', async () => {
+    const origins = ['http://tauri.localhost', 'https://tauri.localhost', 'tauri://localhost', 'https://localhost', 'http://localhost', 'capacitor://localhost']
+    for (const origin of origins) {
+      const response = await handleRequest(
+        new Request('https://ledger.test/api/auth/sign-up', {
+          method: 'OPTIONS',
+          headers: { origin, 'access-control-request-method': 'POST', 'access-control-request-headers': 'content-type' },
+        }),
+        deps(),
+      )
+      expect(response.status).toBe(204)
+      expect(await response.text()).toBe('')
+      expect(response.headers.get('access-control-allow-origin')).toBe(origin)
+      expect(response.headers.get('access-control-allow-methods')).toContain('POST')
+      expect(response.headers.get('access-control-allow-headers')).toContain('authorization')
+      expect(response.headers.get('access-control-allow-headers')).toContain('content-type')
+      expect(response.headers.get('access-control-max-age')).toBe('86400')
+    }
+  })
+
   it('answers a health check without a session', async () => {
     const response = await handleRequest(new Request('https://ledger.test/health'), deps())
     expect(response.status).toBe(200)

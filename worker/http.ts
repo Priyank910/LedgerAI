@@ -21,17 +21,25 @@ function nowIso(deps: WorkerDeps): string {
   return deps.now?.() ?? new Date().toISOString()
 }
 
+function corsHeaders(origin: string | null): Record<string, string> {
+  return {
+    'access-control-allow-origin': origin && origin !== 'null' ? origin : '*',
+    'access-control-allow-headers': 'authorization, content-type',
+    'access-control-allow-methods': 'GET, POST, OPTIONS',
+    'access-control-max-age': '86400',
+    vary: 'Origin',
+  }
+}
+
 function json(body: unknown, status = 200, origin: string | null = '*'): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: {
-      'content-type': 'application/json',
-      'access-control-allow-origin': origin && origin !== 'null' ? origin : '*',
-      'access-control-allow-headers': 'authorization, content-type',
-      'access-control-allow-methods': 'GET, POST, OPTIONS',
-      vary: 'Origin',
-    },
+    headers: { 'content-type': 'application/json', ...corsHeaders(origin) },
   })
+}
+
+function preflight(origin: string | null): Response {
+  return new Response(null, { status: 204, headers: corsHeaders(origin) })
 }
 
 async function readJson(request: Request): Promise<Record<string, unknown> | null> {
@@ -74,7 +82,7 @@ function isTransaction(value: unknown): value is Transaction {
 
 export async function handleRequest(request: Request, deps: WorkerDeps): Promise<Response> {
   const origin = request.headers.get('origin')
-  if (request.method === 'OPTIONS') return json({ ok: true }, 204, origin)
+  if (request.method === 'OPTIONS') return preflight(origin)
   const url = new URL(request.url)
   const path = url.pathname
   if (request.method === 'GET' && (path === '/' || path === '/health')) return json({ ok: true }, 200, origin)

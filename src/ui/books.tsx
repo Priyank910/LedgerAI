@@ -146,7 +146,11 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       setEmail(session.email)
       return null
     } catch (error) {
-      return error instanceof Error && error.message === 'exists' ? 'authFailed' : 'authFailed'
+      const code = error instanceof Error ? error.message : ''
+      if (code === 'exists') return 'accountExists'
+      if (code === 'short') return 'passwordTooShort'
+      if (code === 'unreachable') return 'accountUnreachable'
+      return 'accountFailed'
     }
   }
 
