@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CATEGORY_IDS } from '../../domain/types'
 import { shiftDay, shiftMonth, shiftYear, todayLocal } from '../../domain/dates'
 import { formatInrPlain } from '../../domain/money'
@@ -38,7 +38,10 @@ export function LedgerScreen({ onAdd, onOpen }: { onAdd: (type: TxType) => void;
   const [to, setTo] = useState(todayLocal())
   const [type, setType] = useState<'all' | TxType>('all')
   const [category, setCategory] = useState('all')
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(() => sessionStorage.getItem('ledger-ai-search') ?? '')
+  useEffect(() => {
+    sessionStorage.removeItem('ledger-ai-search')
+  }, [])
   const [busy, setBusy] = useState(false)
   if (!profile) return null
   const shop = profile

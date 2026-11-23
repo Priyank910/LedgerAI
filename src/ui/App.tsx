@@ -1,5 +1,5 @@
 import { Component, useEffect, useState, type ErrorInfo, type ReactNode } from 'react'
-import { BarChart3, BookOpen, Home, MessageCircle, Settings } from 'lucide-react'
+import { BarChart3, BookOpen, CircleHelp, Cloud, Home, LogOut, MessageCircle, Plus, Search, Settings } from 'lucide-react'
 import { translate } from '../i18n'
 import type { Transaction, TxType } from '../domain/types'
 import { BooksProvider, useBooks } from './books'
@@ -46,10 +46,13 @@ class BooksBoundary extends Component<{ children: ReactNode }, { failed: boolean
 }
 
 function Shell() {
-  const { state, notice, dispatch, notify } = useBooks()
+  const { state, notice, dispatch, notify, email, signOut, syncStatus } = useBooks()
   const [page, setPage] = useState<Page>(readPage)
   const [draft, setDraft] = useState<Draft | null>(null)
+  const [query, setQuery] = useState('')
+  const [help, setHelp] = useState(false)
   const t = (key: 'home' | 'ledger' | 'insights' | 'ask' | 'settings') => translate(state.locale, key)
+  const label = (key: 'menuLabel' | 'generalLabel' | 'helpLabel' | 'helpBody' | 'signOut' | 'searchEntries' | 'getAndroid' | 'getWindows' | 'signInToSync' | 'addIncome' | 'promoBody' | 'downloadApp') => translate(state.locale, key)
 
   useEffect(() => {
     const onHash = () => setPage(readPage())
@@ -87,25 +90,80 @@ function Shell() {
     ['ask', MessageCircle],
     ['settings', Settings],
   ] as const
+  const todayCount = state.transactions.filter((row) => !row.deletedAt && row.date === new Date().toISOString().slice(0, 10)).length
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        document.getElementById('entry-search')?.focus()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   return (
     <div className="shell">
-      <nav className="rail" aria-label={t('home')}>
-        {items.map(([id, Icon]) => (
+      <nav className="rail" aria-label={label('menuLabel')}>
+        <p className="rail-logo">Ledger AI</p>
+        <p className="rail-label">{label('menuLabel')}</p>
+        {items.slice(0, 4).map(([id, Icon]) => (
           <button key={id} type="button" aria-current={page === id ? 'page' : undefined} onClick={() => go(id)}>
-            <Icon />
+            <Icon size={18} />
             <span>{t(id)}</span>
+            {id === 'ledger' ? <span className="rail-count">{todayCount}</span> : null}
           </button>
         ))}
+        <p className="rail-label">{label('generalLabel')}</p>
+        <button type="button" aria-current={page === 'settings' ? 'page' : undefined} onClick={() => go('settings')}>
+          <Settings size={18} />
+          <span>{t('settings')}</span>
+        </button>
+        <button type="button" onClick={() => setHelp(true)}>
+          <CircleHelp size={18} />
+          <span>{label('helpLabel')}</span>
+        </button>
+        <button type="button" onClick={() => void signOut()}>
+          <LogOut size={18} />
+          <span>{label('signOut')}</span>
+        </button>
+        <div className="rail-promo">
+          <strong className="promo-desk">{label('getAndroid')}</strong>
+          <strong className="promo-phone">{label('getWindows')}</strong>
+          <p>{label('promoBody')}</p>
+          <a href="https://github.com/Priyank910/LedgerAI/releases/latest">{label('downloadApp')}</a>
+        </div>
       </nav>
+      <div className="desk-main">
+      <header className="topbar">
+        <form className="top-search" onSubmit={(event) => { event.preventDefault(); sessionStorage.setItem('ledger-ai-search', query); go('ledger') }}>
+          <Search size={16} aria-hidden />
+          <label className="sr-only" htmlFor="entry-search">{label('searchEntries')}</label>
+          <input id="entry-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={label('searchEntries')} />
+          <kbd>Ctrl+K</kbd>
+        </form>
+        <p className={`icon-btn sync-btn ${syncStatus.kind}`} role="status" title={translate(state.locale, syncStatus.kind === 'synced' ? 'synced' : syncStatus.kind === 'syncing' ? 'syncing' : syncStatus.kind === 'offline' ? 'syncOffline' : syncStatus.kind === 'error' ? 'syncError' : syncStatus.kind === 'signed-out' ? 'syncSignedOut' : 'syncUnconfigured', syncStatus.kind === 'synced' ? { time: syncStatus.at } : undefined)}>
+          <Cloud size={18} aria-hidden />
+          <i />
+        </p>
+        <button type="button" className="who" onClick={() => go('settings')}>
+          <span className="avatar">{(state.profile?.shopName ?? 'L').slice(0, 1)}</span>
+          <span>
+            <strong>{state.profile?.shopName}</strong>
+            <small>{email ?? label('signInToSync')}</small>
+          </span>
+        </button>
+      </header>
       <div key={page} className="stage page-swap">
-        <div className="tape" aria-hidden="true" />
         {page === 'home' ? <HomeScreen onDraft={setDraft} onLedger={() => go('ledger')} onAsk={ask} onDelete={remove} /> : null}
         {page === 'ledger' ? <LedgerScreen onAdd={add} onOpen={open} /> : null}
         {page === 'insights' ? <InsightsScreen /> : null}
         {page === 'ask' ? <AskScreen /> : null}
         {page === 'settings' ? <SettingsScreen /> : null}
       </div>
+      </div>
+      <button type="button" className="sticky-add" aria-label={label('addIncome')} onClick={() => add('income')}><Plus size={26} /></button>
       <nav className="tabbar" aria-label={t('home')}>
         {items.map(([id, Icon]) => (
           <button key={id} type="button" aria-current={page === id ? 'page' : undefined} onClick={() => go(id)}>
@@ -116,6 +174,15 @@ function Shell() {
       </nav>
       {draft ? <EntrySheet key={`${draft.mode}-${draft.id ?? draft.type}`} draft={draft} onClose={() => setDraft(null)} /> : null}
       {notice ? <p className="toast" role="status">{notice}</p> : null}
+      {help ? (
+        <div className="help-card" role="presentation" onClick={() => setHelp(false)}>
+          <section role="dialog" aria-labelledby="help-title" onClick={(event) => event.stopPropagation()}>
+            <h2 id="help-title">{label('helpLabel')}</h2>
+            <p>{label('helpBody')}</p>
+            <button type="button" className="primary" onClick={() => setHelp(false)}>{translate(state.locale, 'close')}</button>
+          </section>
+        </div>
+      ) : null}
     </div>
   )
 }
