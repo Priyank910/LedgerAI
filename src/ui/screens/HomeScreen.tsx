@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowUpRight } from 'lucide-react'
+import { ArrowUpRight, MoreHorizontal, Scissors, Shirt, Zap } from 'lucide-react'
 import { categoryLabel, formatDate, translate, type MessageKey } from '../../i18n'
 import { shiftMonth, todayLocal } from '../../domain/dates'
 import { quickAdds } from '../../domain/insights'
@@ -10,6 +10,13 @@ import { useBooks, type SyncStatus } from '../books'
 import { draftFrom, draftPreset, type Draft } from '../EntrySheet'
 import { MoneyFigure } from '../MoneyFigure'
 import { shareStatement } from '../statementExport'
+
+function Delta({ current, previous, label }: { current: number; previous: number; label: string }) {
+  if (previous === 0 && current === 0) return null
+  const pct = previous === 0 ? 100 : Math.round(((current - previous) / Math.abs(previous)) * 100)
+  const text = `${pct > 0 ? '+' : ''}${pct}% ${label}`
+  return <small className={pct < 0 ? 'delta down' : 'delta'}>{text}</small>
+}
 
 function syncLabel(status: SyncStatus, t: (key: MessageKey, vars?: Record<string, string | number>) => string): string {
   switch (status.kind) {
@@ -50,6 +57,7 @@ export function HomeScreen({
   const [category, setCategory] = useState('stitching')
   const [exportOpen, setExportOpen] = useState(false)
   const [filter, setFilter] = useState<'day' | 'month' | 'year' | 'custom'>('month')
+  const [openMenu, setOpenMenu] = useState<string | null>(null)
   if (!profile) return null
   const shop = profile
   const t = (key: MessageKey, vars?: Record<string, string | number>) => translate(state.locale, key, vars)
@@ -65,14 +73,19 @@ export function HomeScreen({
     return sum + (row.type === 'income' ? row.amountPaise : -row.amountPaise)
   }, 0)
   const recent = recentTransactions(state.transactions, 5)
+  const yesterdayDate = new Date(`${today}T12:00:00`)
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1)
+  const yesterday = `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth() + 1).padStart(2, '0')}-${String(yesterdayDate.getDate()).padStart(2, '0')}`
+  const yesterdayTotals = periodTotals(state.transactions, { from: yesterday, to: yesterday })
   const days = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(`${today}T00:00:00`)
+    const date = new Date(`${today}T12:00:00`)
     date.setDate(date.getDate() - (6 - index))
-    const stamp = date.toISOString().slice(0, 10)
+    const stamp = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
     const totals = periodTotals(state.transactions, { from: stamp, to: stamp })
-    return { stamp, label: stamp.slice(8), income: totals.incomePaise, expense: totals.expensePaise }
+    return { stamp, label: String(date.getDate()), income: totals.incomePaise, expense: totals.expensePaise }
   })
   const dayMax = Math.max(1, ...days.flatMap((day) => [day.income, day.expense]))
+  const weekTotal = days.reduce((sum, day) => sum + day.income + day.expense, 0)
   const categories = categoryTotals(state.transactions, month)
     .map((row) => ({ ...row, paise: row.expensePaise + row.incomePaise }))
     .filter((row) => row.paise > 0)
@@ -80,8 +93,7 @@ export function HomeScreen({
   const categoryMax = Math.max(1, ...categories.map((row) => row.paise))
   const share = monthTotals.incomePaise + monthTotals.expensePaise
   const incomeShare = share === 0 ? 0 : Math.round((monthTotals.incomePaise / share) * 100)
-  const delta = monthTotals.netPaise - previousTotals.netPaise
-  const adds = quickAdds(state.transactions)
+  const adds = quickAdds(state.transactions).filter((item, index, list) => list.findIndex((other) => other.category === item.category) === index)
   const suggestions = [t('suggestionCloth'), t('suggestionBalance'), t('suggestionIncome')]
   const monthRange = filter === 'day' ? resolvePeriod({ kind: 'day', date: today }) : filter === 'year' ? resolvePeriod({ kind: 'year', year: today.slice(0, 4) }) : month
 
@@ -143,63 +155,79 @@ export function HomeScreen({
       <div className="stat-row">
         <article className="stat hero">
           <header><span>{t('balance')}</span><button type="button" onClick={onLedger} aria-label={t('openLedger')}><ArrowUpRight size={16} /></button></header>
-          <MoneyFigure paise={balance} />
-          <small>{formatInr(delta)} {t('vsLastMonth')}</small>
+          <MoneyFigure className="kpi" paise={balance} />
+          <Delta current={monthTotals.netPaise} previous={previousTotals.netPaise} label={t('vsLastMonth')} />
         </article>
         <article className="stat">
           <header><span>{t('today')} {t('income')}</span><button type="button" onClick={() => onDraft(draftPreset({ type: 'income', title: '', category: 'stitching', payment: 'cash' }))} aria-label={t('addIncome')}><ArrowUpRight size={16} /></button></header>
-          <MoneyFigure paise={todayTotals.incomePaise} />
-          <small>{t('vsLastMonth')}</small>
+          <MoneyFigure className="kpi" paise={todayTotals.incomePaise} />
+          <Delta current={todayTotals.incomePaise} previous={yesterdayTotals.incomePaise} label={t('vsLastMonth')} />
         </article>
         <article className="stat">
           <header><span>{t('today')} {t('expense')}</span><button type="button" onClick={() => onDraft(draftPreset({ type: 'expense', title: '', category: 'cloth', payment: 'cash' }))} aria-label={t('addExpense')}><ArrowUpRight size={16} /></button></header>
-          <MoneyFigure paise={todayTotals.expensePaise} />
-          <small>{t('vsLastMonth')}</small>
+          <MoneyFigure className="kpi" paise={todayTotals.expensePaise} />
+          <Delta current={todayTotals.expensePaise} previous={yesterdayTotals.expensePaise} label={t('vsLastMonth')} />
         </article>
         <article className="stat">
           <header><span>{t('thisMonth')} {t('net')}</span><button type="button" onClick={onLedger} aria-label={t('openLedger')}><ArrowUpRight size={16} /></button></header>
-          <MoneyFigure paise={monthTotals.netPaise} />
-          <small>{formatInr(delta)} {t('vsLastMonth')}</small>
+          <MoneyFigure className="kpi" paise={monthTotals.netPaise} />
+          <Delta current={monthTotals.netPaise} previous={previousTotals.netPaise} label={t('vsLastMonth')} />
         </article>
       </div>
       <div className="dash-grid">
         <section className="card">
           <h2>{t('incomeVsExpense')}</h2>
-          <div className="week" aria-hidden="true">
-            {days.map((day) => (
-              <div className="week-col" key={day.stamp}>
-                <span className="week-bars">
-                  {day.income > 0 ? <i className="pill" style={{ height: `${(day.income / dayMax) * 100}%` }} /> : null}
-                  {day.expense > 0 ? <i className="pill out" style={{ height: `${(day.expense / dayMax) * 100}%` }} /> : null}
-                </span>
-                <span>{day.label}</span>
-              </div>
-            ))}
+          <div className="week">
+            {days.map((day) => {
+              const incomePx = day.income > 0 ? Math.max(28, Math.round((day.income / dayMax) * 112)) : 0
+              const expensePx = day.expense > 0 ? Math.max(28, Math.round((day.expense / dayMax) * 112)) : 0
+              const shareOfWeek = weekTotal === 0 ? 0 : Math.round(((day.income + day.expense) / weekTotal) * 100)
+              return (
+                <div className="week-col" key={day.stamp}>
+                  {day.stamp === today ? <span className="tip">{shareOfWeek}%</span> : <span className="tip tip-spacer" />}
+                  <span className="week-bars">
+                    <i className="pill" style={{ height: `${incomePx}px` }} />
+                    <i className="pill out" style={{ height: `${expensePx}px` }} />
+                  </span>
+                  <span>{day.label}</span>
+                </div>
+              )
+            })}
           </div>
         </section>
         <section className="card">
           <h2>{t('quickAdd')}</h2>
-          <div className="quick-line">
-            <input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} aria-label={t('amount')} placeholder={t('amount')} />
+          <label className="amount-line">
+            <span className="sr-only">{t('amount')}</span>
+            <input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0" />
+          </label>
+          <div className="segment" role="group" aria-label={t('typeIncome')}>
             <button type="button" aria-pressed={kind === 'income'} onClick={() => setKind('income')}>{t('typeIncome')}</button>
             <button type="button" aria-pressed={kind === 'expense'} onClick={() => setKind('expense')}>{t('typeExpense')}</button>
           </div>
           <div className="chips">
             {adds.slice(0, 4).map((item) => (
-              <button key={`${item.category}-${item.type}`} type="button" aria-pressed={category === item.category} onClick={() => { setCategory(item.category); setKind(item.type) }}>
+              <button key={item.category} type="button" aria-pressed={category === item.category} onClick={() => { setCategory(item.category); setKind(item.type) }}>
                 {categoryLabel(state.locale, item.category)}
               </button>
             ))}
-            <button type="button" className="quick-save" onClick={() => void saveQuick()}>{t('saveShop').split(' ')[0]}</button>
           </div>
+          <button type="button" className="quick-save" onClick={() => void saveQuick()}>{t('saveEntry')}</button>
         </section>
         <section className="card">
           <h2>{t('recent')}</h2>
           {recent.length === 0 ? <p>{t('emptyHome')}</p> : recent.map((row) => (
             <div className="entry-row" key={row.id}>
-              <button type="button" onClick={() => onDraft(draftFrom(row.type, row))}>{row.title || categoryLabel(state.locale, row.category)}</button>
-              <strong>{formatInr(row.type === 'expense' ? -row.amountPaise : row.amountPaise)}</strong>
-              <button type="button" onClick={() => onDelete(row)}>{t('delete')}</button>
+              <span className={`cat-icon ${row.type}`} aria-hidden>{row.category === 'cloth' ? <Shirt size={16} /> : row.category === 'electricity' ? <Zap size={16} /> : <Scissors size={16} />}</span>
+              <button type="button" className="entry-copy" onClick={() => onDraft(draftFrom(row.type, row))}>
+                <strong>{row.title || categoryLabel(state.locale, row.category)}</strong>
+                <small>{formatDate(row.date, state.locale)}</small>
+              </button>
+              <strong className={row.type === 'income' ? 'amt in' : 'amt out'}>{formatInr(row.amountPaise)}</strong>
+              <span className="overflow">
+                <button type="button" aria-label={t('delete')} onClick={() => setOpenMenu(openMenu === row.id ? null : row.id)}><MoreHorizontal size={16} /></button>
+                {openMenu === row.id ? <button type="button" className="overflow-menu" onClick={() => { onDelete(row); setOpenMenu(null) }}>{t('delete')}</button> : null}
+              </span>
             </div>
           ))}
         </section>
@@ -236,6 +264,11 @@ export function HomeScreen({
           <p>{t('net')} {formatInr(periodTotals(state.transactions, filter === 'custom' ? month : monthRange).netPaise)}</p>
         </section>
       </div>
+      <aside className="phone-promo">
+        <strong>{t('getWindows')}</strong>
+        <p>{t('promoBody')}</p>
+        <a href="https://github.com/Priyank910/LedgerAI/releases/latest">{t('downloadApp')}</a>
+      </aside>
     </div>
   )
 }

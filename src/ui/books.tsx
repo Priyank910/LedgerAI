@@ -63,15 +63,28 @@ export function BooksProvider({ children }: { children: ReactNode }) {
     void loadState().then((loaded) => {
       if (import.meta.env.DEV && new URLSearchParams(location.search).get('preview') === 'shop' && loaded.profile === null) {
         const now = new Date().toISOString()
-        const today = now.slice(0, 10)
+        const stamp = (daysAgo: number) => {
+          const date = new Date()
+          date.setDate(date.getDate() - daysAgo)
+          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+        }
+        const today = stamp(0)
+        const row = (id: string, type: 'income' | 'expense', title: string, amountPaise: number, daysAgo: number, category: string) => ({
+          id, type, title, amountPaise, date: stamp(daysAgo), payment: 'cash', category, note: '', updatedAt: now, deletedAt: null,
+        })
         setState({
           ...loaded,
           profile: { shopName: 'શ્રી ગણેશ ટેલર્સ', openingBalancePaise: 4_822_000, setupDate: today, updatedAt: now },
           transactions: [
-            { id: 'd1', type: 'income', title: 'બ્લાઉઝ સિલાઈ, મીના પટેલ', amountPaise: 85_000, date: today, payment: 'cash', category: 'stitching', note: '', updatedAt: now, deletedAt: null },
-            { id: 'd2', type: 'expense', title: 'બજારમાંથી કાપડ', amountPaise: 240_000, date: today, payment: 'upi', category: 'cloth', note: '', updatedAt: now, deletedAt: null },
-            { id: 'd3', type: 'income', title: 'શેરવાની, રાજેશભાઈ', amountPaise: 1_500_000, date: today, payment: 'upi', category: 'stitching', note: '', updatedAt: now, deletedAt: null },
-            { id: 'd4', type: 'expense', title: 'વીજળી બિલ', amountPaise: 180_000, date: today, payment: 'bank', category: 'electricity', note: '', updatedAt: now, deletedAt: null },
+            row('d1', 'income', 'બ્લાઉઝ સિલાઈ, મીના પટેલ', 85_000, 0, 'stitching'),
+            row('d2', 'expense', 'બજારમાંથી કાપડ', 240_000, 0, 'cloth'),
+            row('d3', 'income', 'શેરવાની, રાજેશભાઈ', 1_500_000, 0, 'stitching'),
+            row('d4', 'expense', 'વીજળી બિલ', 180_000, 1, 'electricity'),
+            row('d5', 'income', 'ધોરણ 6ના યુનિફોર્મ', 45_000, 2, 'stitching'),
+            row('d6', 'expense', 'દોરો અને બટન', 32_000, 3, 'notions'),
+            row('d7', 'income', 'પાટલૂન સિલાઈ', 120_000, 4, 'stitching'),
+            row('d8', 'income', 'સાડી ફોલ', 15_000, 5, 'alteration'),
+            row('d9', 'expense', 'ભાડું', 800_000, 32, 'rent'),
           ],
         })
         return

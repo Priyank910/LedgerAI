@@ -1,5 +1,5 @@
 import { Component, useEffect, useState, type ErrorInfo, type ReactNode } from 'react'
-import { BarChart3, BookOpen, CircleHelp, Home, LogOut, MessageCircle, Search, Settings } from 'lucide-react'
+import { BarChart3, BookOpen, CircleHelp, Cloud, Home, LogOut, MessageCircle, Plus, Search, Settings } from 'lucide-react'
 import { translate } from '../i18n'
 import type { Transaction, TxType } from '../domain/types'
 import { BooksProvider, useBooks } from './books'
@@ -52,7 +52,7 @@ function Shell() {
   const [query, setQuery] = useState('')
   const [help, setHelp] = useState(false)
   const t = (key: 'home' | 'ledger' | 'insights' | 'ask' | 'settings') => translate(state.locale, key)
-  const label = (key: 'menuLabel' | 'generalLabel' | 'helpLabel' | 'helpBody' | 'signOut' | 'searchEntries' | 'getAndroid' | 'getWindows' | 'signInToSync' | 'addIncome') => translate(state.locale, key)
+  const label = (key: 'menuLabel' | 'generalLabel' | 'helpLabel' | 'helpBody' | 'signOut' | 'searchEntries' | 'getAndroid' | 'getWindows' | 'signInToSync' | 'addIncome' | 'promoBody' | 'downloadApp') => translate(state.locale, key)
 
   useEffect(() => {
     const onHash = () => setPage(readPage())
@@ -129,8 +129,10 @@ function Shell() {
           <span>{label('signOut')}</span>
         </button>
         <div className="rail-promo">
-          <a className="promo-desk" href="https://github.com/Priyank910/LedgerAI/releases/latest">{label('getAndroid')}</a>
-          <a className="promo-phone" href="https://github.com/Priyank910/LedgerAI/releases/latest">{label('getWindows')}</a>
+          <strong className="promo-desk">{label('getAndroid')}</strong>
+          <strong className="promo-phone">{label('getWindows')}</strong>
+          <p>{label('promoBody')}</p>
+          <a href="https://github.com/Priyank910/LedgerAI/releases/latest">{label('downloadApp')}</a>
         </div>
       </nav>
       <div className="desk-main">
@@ -139,9 +141,12 @@ function Shell() {
           <Search size={16} aria-hidden />
           <label className="sr-only" htmlFor="entry-search">{label('searchEntries')}</label>
           <input id="entry-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={label('searchEntries')} />
-          <kbd>Ctrl K</kbd>
+          <kbd>Ctrl+K</kbd>
         </form>
-        <p className="icon-btn" role="status" title={syncStatus.kind}>{syncStatus.kind === 'synced' ? '●' : '○'}</p>
+        <p className={`icon-btn sync-btn ${syncStatus.kind}`} role="status" title={translate(state.locale, syncStatus.kind === 'synced' ? 'synced' : syncStatus.kind === 'syncing' ? 'syncing' : syncStatus.kind === 'offline' ? 'syncOffline' : syncStatus.kind === 'error' ? 'syncError' : syncStatus.kind === 'signed-out' ? 'syncSignedOut' : 'syncUnconfigured', syncStatus.kind === 'synced' ? { time: syncStatus.at } : undefined)}>
+          <Cloud size={18} aria-hidden />
+          <i />
+        </p>
         <button type="button" className="who" onClick={() => go('settings')}>
           <span className="avatar">{(state.profile?.shopName ?? 'L').slice(0, 1)}</span>
           <span>
@@ -158,7 +163,7 @@ function Shell() {
         {page === 'settings' ? <SettingsScreen /> : null}
       </div>
       </div>
-      <button type="button" className="sticky-add" onClick={() => add('income')}>{label('addIncome')}</button>
+      <button type="button" className="sticky-add" aria-label={label('addIncome')} onClick={() => add('income')}><Plus size={26} /></button>
       <nav className="tabbar" aria-label={t('home')}>
         {items.map(([id, Icon]) => (
           <button key={id} type="button" aria-current={page === id ? 'page' : undefined} onClick={() => go(id)}>
