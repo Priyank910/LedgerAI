@@ -1,0 +1,5 @@
+# Copy to .dev.vars for `npx wrangler dev`. Never commit .dev.vars.
+# This key is a Worker secret. It is not a VITE_ variable and never ships in the app.
+OPENROUTER_API_KEY=
+# Optional. wrangler.toml already defaults to google/gemini-2.5-flash.
+OPENROUTER_MODEL=google/gemini-2.5-flash

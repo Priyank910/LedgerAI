@@ -1,0 +1,165 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  # GitHub lists Run workflow only after this file is on the default branch.
+  # Until then, publishing a v* tag on this branch starts the release.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, for example v0.1.0. Leave empty to use v0.0.0-ci.<run number>."
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  VITE_API_URL: "${{ vars.VITE_API_URL || secrets.VITE_API_URL || 'https://ledger-ai.priyank-chavda.workers.dev' }}"
+  RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || (github.event.inputs.tag || format('v0.0.0-ci.{0}', github.run_number)) }}
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platforms;android-36 build-tools;36.0.0 platform-tools
+      - run: npm ci
+      - name: Set the app version from the tag
+        run: node scripts/set-release-version.mjs "$RELEASE_TAG"
+      - name: Build the web bundle
+        run: npm run build
+      - name: Sync Capacitor
+        run: |
+          npx cap sync android
+          grep -q capacitor-app android/capacitor.settings.gradle
+          grep -q '@capacitor/app' android/app/src/main/assets/capacitor.plugins.json
+      - name: Prepare the release keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keystore="$GITHUB_WORKSPACE/android/app/release.keystore"
+          if [ -z "${ANDROID_KEYSTORE_BASE64}" ] || [ -z "${ANDROID_KEYSTORE_PASSWORD}" ] || [ -z "${ANDROID_KEY_ALIAS}" ] || [ -z "${ANDROID_KEY_PASSWORD}" ]; then
+            echo "Set ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD."
+            echo "The keystore is PKCS12. ANDROID_KEY_ALIAS for this shop is ledgerai."
+            exit 1
+          fi
+          echo "Signing with the PKCS12 release keystore from repository secrets."
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$keystore"
+          alias="$ANDROID_KEY_ALIAS"
+          store_pass="$ANDROID_KEYSTORE_PASSWORD"
+          key_pass="$ANDROID_KEY_PASSWORD"
+          {
+            echo "ANDROID_KEYSTORE_FILE=$keystore"
+            echo "ANDROID_KEYSTORE_PASSWORD=$store_pass"
+            echo "ANDROID_KEY_ALIAS=$alias"
+            echo "ANDROID_KEY_PASSWORD=$key_pass"
+          } >> "$GITHUB_ENV"
+      - name: Assemble the release APK
+        working-directory: android
+        run: chmod +x ./gradlew && ./gradlew assembleRelease --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Worker URL baked into the app
+        shell: bash
+        run: echo "VITE_API_URL=$VITE_API_URL"
+      - run: npm ci
+      - name: Set the app version from the tag
+        shell: bash
+        run: node scripts/set-release-version.mjs "$RELEASE_TAG"
+      - name: Require the updater signing key
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ] || [ -z "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" ]; then
+            echo "Set TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD so the Windows update can be signed."
+            exit 1
+          fi
+          python - << 'PY'
+          import base64, os
+          raw = os.environ["TAURI_SIGNING_PRIVATE_KEY"].strip()
+          try:
+              text = base64.b64decode(raw).decode("utf-8")
+          except Exception:
+              text = raw
+          lengths = [len(line.strip()) for line in text.splitlines() if line.strip() and " " not in line]
+          key_len = max(lengths, default=len(raw))
+          print(f"updater private key material length={key_len}")
+          if key_len < 80:
+              print("TAURI_SIGNING_PRIVATE_KEY is the public key. Replace it with the private key printed by `tauri signer generate`. The public key already belongs in tauri.conf.json.")
+              raise SystemExit(1)
+          PY
+      - name: Build the NSIS and MSI installers
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VITE_API_URL: ${{ env.VITE_API_URL }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: Ledger AI ${{ env.RELEASE_TAG }}
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
+          args: --bundles nsis,msi
+
+  publish-apk:
+    needs: [android, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: apk
+      - name: Attach the APK to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Ledger AI ${{ env.RELEASE_TAG }}
+          draft: false
+          prerelease: false
+          files: apk/*.apk
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Add the Android app to latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "$RELEASE_TAG" --pattern latest.json --dir "$RUNNER_TEMP/rel"
+          node scripts/add-android-to-latest.mjs "$RUNNER_TEMP/rel/latest.json" "$RELEASE_TAG"
+          gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/rel/latest.json" --clobber

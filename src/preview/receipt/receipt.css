@@ -1,0 +1,140 @@
+@import '@fontsource/literata/600.css';
+@import '@fontsource/literata/700.css';
+@import '@fontsource/noto-sans/400.css';
+@import '@fontsource/noto-sans/700.css';
+@import '@fontsource/noto-sans-gujarati/400.css';
+@import '@fontsource/noto-sans-gujarati/700.css';
+@import '@fontsource/noto-sans-devanagari/400.css';
+@import '@fontsource/noto-sans-devanagari/700.css';
+
+.slip {
+  min-height: 100vh;
+  margin: 0;
+  background: #fff8e6;
+  color: #141414;
+  font-family: 'Noto Sans', 'Noto Sans Gujarati', 'Noto Sans Devanagari', sans-serif;
+  font-size: 1.125rem;
+}
+.slip * { box-sizing: border-box; }
+.slip button, .slip input { font: inherit; color: inherit; }
+.slip button { cursor: pointer; }
+.slip :focus-visible { outline: 3px solid #141414; outline-offset: 3px; }
+.slip ::selection { background: #141414; color: #fff; }
+.slip-sheet {
+  width: min(100%, 440px);
+  min-height: 100vh;
+  margin: 0 auto;
+  background: #fff;
+  padding: 1.1rem 1.15rem 2rem;
+}
+.slip-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; }
+.slip h1 {
+  margin: 0;
+  font-family: Literata, 'Noto Sans Gujarati', 'Noto Sans Devanagari', serif;
+  font-size: 2.4rem;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+}
+.slip-lang {
+  min-height: 3rem;
+  padding: 0 0.8rem;
+  border: 2px solid #141414;
+  background: #fff;
+  font-weight: 700;
+}
+.slip-rule { border: 0; border-top: 1px dashed #141414; margin: 0.9rem 0; }
+.slip-nav { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
+.slip-nav button {
+  min-height: 3.4rem;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  font-weight: 700;
+}
+.slip-nav button[aria-current='page'] { border-bottom-color: #f6b400; }
+.slip-line {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+  align-items: baseline;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid #141414;
+  min-height: 3.6rem;
+}
+.slip-line b { font-variant-numeric: tabular-nums; }
+.slip-line span { display: block; color: #2a2a2a; font-size: 0.95rem; }
+.slip-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  margin-top: 1rem;
+  background: #f6b400;
+  color: #141414;
+  padding: 1rem 0.9rem 0.85rem;
+}
+.slip-total strong {
+  font-family: Literata, 'Noto Sans Gujarati', serif;
+  font-size: 3.2rem;
+  line-height: 0.9;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.slip-total em { font-style: normal; font-weight: 700; }
+.slip-form { display: flex; flex-direction: column; gap: 0.8rem; }
+.slip-form label { display: flex; flex-direction: column; gap: 0.35rem; font-weight: 700; }
+.slip-amount {
+  width: 100%;
+  border: 0;
+  border-bottom: 3px solid #141414;
+  background: transparent;
+  font-family: Literata, 'Noto Sans', serif;
+  font-size: 3.4rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  padding: 0.2rem 0;
+  font-variant-numeric: tabular-nums;
+}
+.slip input::placeholder { color: #3a3a3a; opacity: 1; }
+.slip-form input[type='text'] {
+  min-height: 3.4rem;
+  border: 1.5px solid #141414;
+  padding: 0 0.7rem;
+  background: #fff;
+}
+.slip-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.slip-pair button, .slip-save {
+  min-height: 3.6rem;
+  border: 2px solid #141414;
+  background: #fff;
+  font-weight: 700;
+}
+.slip-pair button[aria-pressed='true'], .slip-save { background: #f6b400; }
+.slip-filters { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.8rem 0; }
+.slip-filters button {
+  min-height: 3.2rem;
+  padding: 0 0.9rem;
+  border: 2px solid #141414;
+  background: #fff;
+  font-weight: 700;
+}
+.slip-filters button[aria-pressed='true'] { background: #f6b400; }
+.slip-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.slip-dates input { min-height: 3.2rem; border: 1.5px solid #141414; padding: 0 0.5rem; }
+@media (min-width: 960px) {
+  .slip-sheet { width: min(880px, calc(100% - 4rem)); margin: 2rem auto; min-height: auto; box-shadow: 6px 14px 32px rgb(20 20 20 / 14%); }
+  .slip-home { display: grid; grid-template-columns: 1.3fr 0.9fr; gap: 1.5rem; align-items: end; }
+  .slip-total { min-height: 220px; align-items: flex-end; }
+  .slip-total strong { font-size: 4.2rem; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .slip-line { animation: slip-stamp 320ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .slip-line:nth-child(2) { animation-delay: 40ms; }
+  .slip-line:nth-child(3) { animation-delay: 80ms; }
+  .slip-line:nth-child(4) { animation-delay: 120ms; }
+  .slip-line:nth-child(5) { animation-delay: 150ms; }
+  .slip-view { animation: slip-feed 260ms cubic-bezier(0.16, 1, 0.3, 1); }
+  @keyframes slip-stamp { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0); } }
+  @keyframes slip-feed { from { transform: translateY(12px); } to { transform: none; } }
+}

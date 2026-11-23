@@ -1,0 +1,119 @@
+@import '@fontsource/atkinson-hyperlegible/400.css';
+@import '@fontsource/atkinson-hyperlegible/700.css';
+@import '@fontsource/noto-sans-gujarati/400.css';
+@import '@fontsource/noto-sans-gujarati/700.css';
+@import '@fontsource/noto-sans-devanagari/400.css';
+@import '@fontsource/noto-sans-devanagari/700.css';
+
+.till {
+  min-height: 100vh;
+  background: #fff;
+  color: #141414;
+  font-family: 'Atkinson Hyperlegible', 'Noto Sans Gujarati', 'Noto Sans Devanagari', sans-serif;
+  font-size: 1.125rem;
+}
+.till * { box-sizing: border-box; }
+.till button, .till input, .till select { font: inherit; color: inherit; }
+.till button { cursor: pointer; }
+.till :focus-visible { outline: 3px solid #141414; outline-offset: 3px; }
+.till ::selection { background: #f6b400; color: #141414; }
+.till-page { width: min(100%, 440px); margin: 0 auto; padding: 1.1rem 1rem 7.2rem; }
+.till-bar { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
+.till h1 { margin: 0.2rem 0 0.8rem; font-size: 2rem; letter-spacing: -0.02em; line-height: 1.15; }
+.till-lang { min-height: 3rem; padding: 0 0.9rem; border-radius: 999px; border: 2px solid #141414; background: #fff; font-weight: 700; }
+.till-balance {
+  background: #f6b400;
+  color: #141414;
+  border-radius: 28px;
+  padding: 1.3rem 1.2rem 1.4rem;
+  box-shadow: 4px 10px 24px rgb(20 20 20 / 12%);
+}
+.till-balance span { display: block; font-weight: 700; font-size: 1.05rem; }
+.till-balance strong { display: block; margin-top: 0.25rem; font-size: 3rem; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.till-split { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.9rem; }
+.till-tile {
+  background: #fff;
+  border-radius: 22px;
+  padding: 0.9rem;
+  min-height: 5.5rem;
+  box-shadow: 3px 8px 18px rgb(20 20 20 / 10%);
+  border: 1.5px solid #141414;
+}
+.till-tile span { display: block; font-weight: 700; }
+.till-tile b { display: block; margin-top: 0.3rem; font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+.till-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.6rem;
+  text-align: start;
+  margin-top: 0.7rem;
+  padding: 0.9rem 1rem;
+  min-height: 4.2rem;
+  border-radius: 18px;
+  border: 1.5px solid #141414;
+  background: #fff;
+}
+.till-row small { display: block; color: #2a2a2a; }
+.till-row b.expense { background: #f6b400; border-radius: 999px; padding: 0.2rem 0.55rem; }
+.till-nav {
+  position: fixed;
+  left: 50%;
+  bottom: 0.7rem;
+  transform: translateX(-50%);
+  width: min(420px, calc(100% - 1.2rem));
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  background: #141414;
+  border-radius: 999px;
+  padding: 0.35rem;
+  z-index: 3;
+}
+.till-nav button {
+  position: relative;
+  z-index: 1;
+  min-height: 3.4rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font-weight: 700;
+}
+.till-nav button[aria-current='page'] { background: #f6b400; color: #141414; }
+.till-form, .till-filters { display: flex; flex-direction: column; gap: 0.75rem; }
+.till-form label, .till-dates label { display: flex; flex-direction: column; gap: 0.3rem; font-weight: 700; }
+.till input::placeholder { color: #3a3a3a; opacity: 1; }
+.till-form input, .till-dates input {
+  min-height: 3.5rem;
+  border-radius: 16px;
+  border: 1.5px solid #141414;
+  padding: 0 0.8rem;
+  background: #fff;
+}
+.till-amount { font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.till-pair, .till-chiprow, .till-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.till-chiprow { grid-template-columns: repeat(4, 1fr); }
+.till-pair button, .till-chiprow button, .till-save {
+  min-height: 3.4rem;
+  border-radius: 16px;
+  border: 1.5px solid #141414;
+  background: #fff;
+  font-weight: 700;
+}
+.till-pair button[aria-pressed='true'], .till-chiprow button[aria-pressed='true'], .till-save { background: #f6b400; }
+@media (min-width: 960px) {
+  .till-page { width: min(1040px, calc(100% - 3rem)); padding-bottom: 2rem; }
+  .till-home { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 1.2rem; align-items: start; }
+  .till-list { grid-column: 1 / -1; }
+  .till-nav { position: static; transform: none; width: 420px; margin: 0 0 1rem; }
+  .till-balance strong { font-size: 3.6rem; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .till-view { animation: till-settle 320ms cubic-bezier(0.16, 1, 0.3, 1); }
+  .till-nav button { transition: background-color 220ms ease, color 220ms ease; }
+  .till-row { animation: till-settle 360ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .till-row:nth-child(2) { animation-delay: 40ms; }
+  .till-row:nth-child(3) { animation-delay: 80ms; }
+  .till-row:nth-child(4) { animation-delay: 110ms; }
+  @keyframes till-settle { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+}

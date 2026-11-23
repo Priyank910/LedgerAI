@@ -1,0 +1,61 @@
+export type Lang = 'en' | 'gu'
+
+const en = {
+  home: 'Home',
+  add: 'Add',
+  ledger: 'Ledger',
+  today: 'Today',
+  month: 'Month',
+  year: 'Year',
+  dates: 'Dates',
+  income: 'Income',
+  expense: 'Expense',
+  save: 'Save',
+  description: 'Description',
+  amount: 'Amount',
+  balance: 'Balance',
+  day: 'Day',
+  from: 'From',
+  to: 'To',
+  write: 'Write the line',
+  clear: 'Clear',
+  entries: 'Entries',
+  net: 'Net',
+  opening: 'Opening',
+  closing: 'Closing',
+  particular: 'Particular',
+  back: 'Back',
+  lang: 'ગુજરાતી',
+}
+
+const gu: typeof en = {
+  home: 'ઘર',
+  add: 'ઉમેરો',
+  ledger: 'ખાતું',
+  today: 'આજે',
+  month: 'મહિનો',
+  year: 'વર્ષ',
+  dates: 'તારીખ',
+  income: 'આવક',
+  expense: 'ખર્ચ',
+  save: 'સાચવો',
+  description: 'વિગત',
+  amount: 'રકમ',
+  balance: 'બાકી',
+  day: 'દિવસ',
+  from: 'થી',
+  to: 'સુધી',
+  write: 'લીટી લખો',
+  clear: 'ભૂંસો',
+  entries: 'નોંધ',
+  net: 'ચોખ્ખું',
+  opening: 'શરૂઆત',
+  closing: 'આખર',
+  particular: 'વિગત',
+  back: 'પાછળ',
+  lang: 'English',
+}
+
+export function text(lang: Lang): typeof en {
+  return lang === 'gu' ? gu : en
+}

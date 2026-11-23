@@ -1,0 +1,15 @@
+name = "ledger-ai"
+main = "worker/index.ts"
+compatibility_date = "2025-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 database ledger-ai. If CLOUDFLARE_D1_DATABASE_ID is set, the deploy workflow replaces this.
+[[d1_databases]]
+binding = "DB"
+database_name = "ledger-ai"
+database_id = "0e12107e-4cd7-4c2d-992c-289cd993fc79"
+migrations_dir = "migrations"
+
+[vars]
+# Tool calling, and it answers in Hindi and Gujarati. Override in .dev.vars for local wrangler.
+OPENROUTER_MODEL = "google/gemini-2.5-flash"
