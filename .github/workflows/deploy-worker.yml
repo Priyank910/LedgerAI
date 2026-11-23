@@ -6,7 +6,7 @@ on:
     # Path filters are not applied to tag pushes, so a v* tag on this branch
     # deploys before the workflow is on main. GitHub only lists Run workflow
     # for workflow files that exist on the default branch.
-    branches: [main]
+    branches: [main, cursor/ledger-ai-7160]
     tags:
       - "v*"
     paths:
